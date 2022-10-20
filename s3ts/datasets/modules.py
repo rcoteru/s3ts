@@ -1,121 +1,156 @@
+from locale import windows_locale
+from tkinter import W
 from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
+import torchvision as tv
 
-import pytorch_lightning as pl
+from sklearn.model_selection import train_test_split
+
+from collections import Counter
+from pathlib import Path
 import numpy as np
+import logging
 
-class DTW(Dataset):
+log = logging.Logger(__name__)
 
-    def __init__(self, dtws, labels, window_size=5, transform=None, target_transform=None):
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+class ESM(Dataset):
+
+    def __init__(self, 
+            ESMs: np.ndarray, 
+            labels: np.ndarray, 
+            window_size: int = 5, 
+            windows_label: str = "last", # "last", "mode"
+            transform = None, 
+            target_transform = None):
 
         self.labels = labels
-        self.dtws = dtws
+        self.ESMs = ESMs
+
+        self.window_size = window_size
+        self.window_label = windows_label
+
         self.transform = transform
         self.target_transform = target_transform
-        self.window_size = window_size
 
     @staticmethod
     def load_data(path):
         with np.load(path, 'r') as data:
-            labels = data['STS_labels']
-            dtws = data['DTWs']
-            STS = data['STS']
+            labels = data['labels']
+            ESMs = data['ESMs']
+            STSs = data['STSs']
 
-        return dtws, labels, STS
+        return ESMs, labels, STSs
 
     def __len__(self):
-        return (self.labels.shape[1] + 1 - self.window_size) * self.dtws.shape[0]
 
-    def __getitem__(self, idx):
+        """ Return the number of samples in the dataset. """
+        
+        number_of_STSs = self.labels.shape[0]
+        STS_length = self.labels.shape[1]
+        n_samples_per_STS = STS_length + 1 - self.window_size
 
-        dtw_idx = idx % self.dtws.shape[0]
-        windows_idx = idx // self.dtws.shape[0]
+        return n_samples_per_STS * number_of_STSs
 
-        labels = self.labels[dtw_idx, windows_idx:windows_idx + self.window_size]
-        label_counts = dict(Counter(labels))
-        label = int(max(label_counts, key=label_counts.get))
-        dtw_window = self.dtws[dtw_idx, :, windows_idx:windows_idx + self.window_size, :]
+    def __getitem__(self, idx: int) -> tuple[np.ndarray, int]:
+
+        """ Return an entry (data, label) from the dataset. """
+
+        STS_length = self.labels.shape[1]
+        n_samples_per_STS = STS_length + 1 - self.window_size
+
+        sts_idx = idx // n_samples_per_STS
+        wdw_idx = idx % n_samples_per_STS
+
+        labels = self.labels[sts_idx, wdw_idx:wdw_idx + self.window_size]
+        window = self.ESMs[sts_idx, :, wdw_idx:wdw_idx + self.window_size, :]
+
+        if self.window_label == "last":     # pick the last label of the window
+            labels = labels.squeeze()[-1]   
+        elif self.window_label == "mode":   # pick the most common label in the window
+            label_counts = dict(Counter(labels))
+            label = int(max(label_counts, key=label_counts.get))
+        else:
+            raise NotImplementedError
 
         if self.transform:
-            dtw_window = self.transform(dtw_window)
+            window = self.transform(window)
         if self.target_transform:
             label = self.target_transform(label)
 
-        return dtw_window, label
+        return window, label
 
-class dtwDataModule(pl.LightningDataModule):
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-    def __init__(self, npz_path: str, window_size, batch_size: int = 32, num_workers: int = 4):
-        print("Preparing data")
+class ESM_DM(pl.LightningDataModule):
+
+    def __init__(self, 
+            data_path: Path, 
+            task: str, 
+            window_size: int, 
+            batch_size: int = 32, 
+            num_workers: int = 4):
+        
         super().__init__()
-        self.data_dir = npz_path
+        self.data_path = data_path
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.window_size = window_size
-        print("Done")
+        self.task = task
 
     def prepare_data(self) -> None:
-        print("Preparing data")
 
-        print("Loading train data")
-        dtw_train, labels_train, _ = DTW.load_data(f"{self.data_dir}/DTWs_train.npz")
-        print(f"Train shape {dtw_train.shape}")
+        log.info(" ~ PREPARING DATA MODULE ~ ")
 
-        print("Loading test data")
-        dtw_test, labels_test, _ = DTW.load_data(f"{self.data_dir}/DTWs_test.npz")
-        print(f"Test shape {dtw_test.shape}")
+        print("Loading train data...")
+        ESMs_train, labels_train, _ = ESM.load_data(self.data_path / f"DB-train_{self.task}.npz")
 
-        val_idxs, test_idxs = train_test_split(range(len(dtw_test)), train_size=0.5, test_size=0.5)
+        print("Loading test data...")
+        ESMs_test, labels_test, _ = ESM.load_data(self.data_path / f"DB-test_{self.task}.npz")
 
-        dtw_val, labels_val = dtw_test[val_idxs], labels_test[val_idxs]
-        dtw_test, labels_test = dtw_test[test_idxs], labels_test[test_idxs]
+        log.info("Splitting validation set from test data...")
 
-        print(f"Train size {dtw_train.shape[0]}, val size {dtw_val.shape[0]}, test size {dtw_test.shape[0]}")
+        n_samples_test = ESMs_test.shape[0]
+        val_idxs, test_idxs = train_test_split(range(n_samples_test), train_size=0.5, test_size=0.5)
 
-        avg, std = np.average(dtw_train), np.std(dtw_train)
-        transform = transforms.Compose([transforms.ToTensor(),
-                                       transforms.Normalize((avg,), (std,))])
+        ESMs_val , labels_val = ESMs_test[val_idxs], labels_test[val_idxs]
+        ESMs_test, labels_test = ESMs_test[test_idxs], labels_test[test_idxs]
 
-        self.dtw_train = DTW(dtws=dtw_train,
-                             labels=labels_train,
-                             window_size=self.window_size,
-                             transform=transform)
+        self.labels_size = len(np.unique(labels_train)) # number of labels
+        self.channels = ESMs_train.shape[1]             # number of patterns
 
-        print("DTW TRAIN COMPLETED")
+        log.info("       Train shape:", ESMs_train.shape)
+        log.info("         Val shape:", ESMs_val.shape)
+        log.info("        Test shape:", ESMs_test.shape)
+        log.info("  Number of labels:", self.labels_size)
+        log.info("Number of patterns:", self.channels)
 
-        self.dtw_train.transform = transform
+        log.info("Normalizing data...")
+        avg, std = np.average(ESMs_train), np.std(ESMs_train)
+        transform = tv.transforms.Compose([tv.transforms.ToTensor(), tv.transforms.Normalize((avg,), (std,))])
 
-        self.dtw_val = DTW(dtws=dtw_val,
-                           labels=labels_val,
-                           window_size=self.window_size,
-                           transform=transform)
+        log.info("Creating train dataset...")
+        self.ds_train = ESM(ESMs=ESMs_train, labels=labels_train, window_size=self.window_size,transform=transform)
 
-        print("DTW VAL COMPLETED")
+        log.info("Creating val   dataset...")
+        self.ds_val = ESM(ESMs=ESMs_val, labels=labels_val, window_size=self.window_size, transform=transform)
 
-        self.dtw_test = DTW(dtws=dtw_test,
-                            labels=labels_test,
-                            window_size=self.window_size,
-                            transform=transform)
+        log.info("Creating test  dataset...")
+        self.ds_test = ESM(ESMs=ESMs_test, labels=labels_test, window_size=self.window_size, transform=transform)
 
-        print("DTW TEST COMPLETED")
-
-        self.labels_size = np.unique(self.dtw_train.labels).shape[0]
-        self.channels = self.dtw_train.dtws.shape[-1]
-
-        print("Done")
+        log.info(" ~ PREPARING DATA MODULE ~ ")
 
     def train_dataloader(self):
-        return DataLoader(self.dtw_train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        return DataLoader(self.ds_train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
 
     def val_dataloader(self):
-        return DataLoader(self.dtw_val, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        return DataLoader(self.ds_val, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
 
     def test_dataloader(self):
-        return DataLoader(self.dtw_test, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        return DataLoader(self.ds_test, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
 
     def predict_dataloader(self):
-        return DataLoader(self.dtw_test, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        return DataLoader(self.ds_test, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
 
-
-if __name__ == "__main__":
-    pass
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

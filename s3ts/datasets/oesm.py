@@ -8,7 +8,9 @@ import logging
 
 log = logging.Logger(__name__)
 
-class OES_batch:
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+class OESM:
     
     """
     On-line Elastic Similarity class
@@ -34,13 +36,18 @@ class OES_batch:
         edr threshold parameter
     """
 
-    def __init__(self, R, w, dist='euclidean', epsilon=None):
+    def __init__(self, 
+            R: np.ndarray, 
+            w: float, 
+            dist: str = 'euclidean', 
+            epsilon: float = None
+            ) -> None:
 
         # Check if distance metric choice is valid
-        if dist in ['euclidean', 'edr', 'erp', 'edit', 'euclidean_new']:
+        if dist in ['euclidean', 'edr', 'erp', 'edit']:
             self.dist = dist
         else:
-            raise NotImplementedError('Incorrect distance metric')
+            raise NotImplementedError('Incorrect distance metric.')
 
         if isinstance(R, (np.ndarray)) and R.size > 2:
             self.R = R
@@ -57,7 +64,8 @@ class OES_batch:
             raise ValueError('epsilon must be a non negative float')
         self.epsilon = epsilon
 
-    def init_dist(self, S):
+    def init_dist(self, S: np.ndarray):
+
         """
         Initial Similarity Measure
 
@@ -80,8 +88,6 @@ class OES_batch:
         # Compute point-wise distance
         if self.dist == 'euclidean':
             RS = self.__euclidean(self.R, S)
-        if self.dist == 'euclidean_new':
-            RS = self.__euclidean_new(self.R, S)
         elif self.dist == 'edr':
             RS = self.__edr(self.R, S, self.epsilon)
         elif self.dist == 'erp':
@@ -111,7 +117,8 @@ class OES_batch:
 
         return RS
 
-    def update_dist(self, Y):
+    def update_dist(self, Y: np.ndarray):
+
         '''
         Add new observations to query time series
 
@@ -149,7 +156,9 @@ class OES_batch:
         return dtwRY
 
     def __euclidean(self, X, Y):
-        return distance_matrix(X, Y, p=2)**2
+        Y_tmp, X_tmp = np.meshgrid(Y, X)
+        XY = np.sqrt((X_tmp - Y_tmp)**2)
+        return XY
 
     def __edr(self, X, Y, epsilon):
         Y_tmp, X_tmp = np.meshgrid(Y, X)
@@ -168,6 +177,7 @@ class OES_batch:
         return XY
 
     def _solveRY(self, Y, dtwR):
+
         '''
         R, Y: to (partial) time series
          -----------
@@ -179,14 +189,12 @@ class OES_batch:
         iniI: Index of the first point of R in the complete time series
         iniJ: Index of the first point of Y in the complete time series
 
-        * Warning *: R and Y have to be nonempty (partial) series
+        * Warning *: R and Y have to be non-empty (partial) series
         '''
 
         # Compute point-wise distance
         if self.dist == 'euclidean':
             RY = self.__euclidean(self.R, Y)
-        if self.dist == 'euclidean_new':
-            RY = self.__euclidean_new(self.R, Y)
         elif self.dist == 'edr':
             RY = self.__edr(self.R, Y, self.epsilon)
         elif self.dist == 'erp':
@@ -214,9 +222,17 @@ class OES_batch:
 
         return RY[:, -1]
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def compute_odtw_distance_matrix(pattern, sts, rho, dist="euclidean"):
+def compute_OESM_distance_matrix(
+        pattern: np.ndarray, 
+        STS: np.ndarray, 
+        rho: float, 
+        dist: str = "euclidean"
+        ) -> np.ndarray:
     
+    """ Wapper that uses the OES class to """
+
     """
     Compute distance matrix.
     :param ref: reference pattern
@@ -225,24 +241,32 @@ def compute_odtw_distance_matrix(pattern, sts, rho, dist="euclidean"):
     :return: distance matrices
     """
 
+    
+
     # print('Computing ODTW distance matrix')
 
-    distMat = np.zeros((ref.shape[0], stream.shape[0]))
     
-    odtw = OEM_batch(ref, rho, dist=dist)
-    distMat[:, :3] = odtw.init_dist(stream[:3])
+    
+    init_width = 3
 
-    for point in range(3, stream.shape[0]):
-        if type(stream[point]) is list or type(stream[point]) is np.ndarray:
-            tmp_stream = np.expand_dims(stream[point], axis=0)
-        else:
-            tmp_stream = [stream[point]]
-        distMat[:, point] = odtw.update_dist(tmp_stream)
+    oesm = OESM(pattern, rho, dist=dist)
+    dtw_mat = np.zeros((len(pattern), len(STS)))
+    dtw_mat[:,:init_width] = oesm.init_dist(STS[:init_width])
 
-    return distMat
+    for point in range(init_width, len(STS)):
 
+        # if type(stream[point]) is list or type(stream[point]) is np.ndarray:
+        #     tmp_stream = np.expand_dims(stream[point], axis=0)
+        # else:
+        #     tmp_stream = [stream[point]]
+        
+        dtw_mat[:, point] = oesm.update_dist(STS[point:point+1])
 
-def compute_ESM_sc(
+    return dtw_mat
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+def compute_OESM_sc(
         sts_idx: np.ndarray, 
         STSs: np.ndarray, 
         patterns: np.ndarray, 
@@ -266,9 +290,9 @@ def compute_ESM_sc(
     partial_ESM = np.zeros((n_patts, patt_length, sts_length))
 
     for patt_idx in range(n_patts):
-        partial_ESM[patt_idx, :, :] = compute_odtw_distance_matrix(
-            pattern=patterns[patt_idx], sts=STSs[sts_idx], 
-            rho=rho, dist="euclidean_new")
+        partial_ESM[patt_idx, :, :] = compute_OESM_distance_matrix(
+            pattern=patterns[patt_idx], STS=STSs[sts_idx], 
+            rho=rho, dist="euclidean")
         with lock: # Update the progress bar
             bar.update(1)
 
@@ -279,15 +303,15 @@ def compute_ESM_sc(
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def compute_ESMs(
+def compute_OESMs(
         STSs: np.ndarray, 
         patterns: np.ndarray,
         rho: float,
         nprocs: int = 4
     ):
 
-    assert(len(STSs) == 2)
-    n_STS = STSs.shape[1]
+    assert(len(STSs.shape) == 2)
+    n_STS = STSs.shape[0]
 
     assert(len(patterns.shape) == 2)
     n_patts = patterns.shape[0]
@@ -301,11 +325,12 @@ def compute_ESMs(
     STS_ids = np.arange(n_STS).tolist()
 
     # INFO: "partial" basically makes "wrapper_compute" take only the data as argument
-    compute_ESM_sc_call = partial(compute_ESM_sc, STSs=STSs,
-                                patterns=patterns, rho=scaled_rho,
-                                lock=lock)
+    compute_OESM_sc_call = partial(compute_OESM_sc, STSs=STSs, patterns=patterns, 
+                                    rho=scaled_rho, lock=lock)
 
     with mp.Pool(processes=nprocs) as pool:
-        full_DTWs = pool.map(compute_ESM_sc_call, STS_ids)
+        full_DTWs = pool.map(compute_OESM_sc_call, STS_ids)
 
     full_DTWs = np.array(full_DTWs)
+
+    return full_DTWs
