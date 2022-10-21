@@ -53,6 +53,7 @@ tensorboard-plugin-wit==1.8.1
 threadpoolctl==3.1.0
 torch==1.12.1
 torchmetrics==0.10.0
+torchvision==0.13.1
 tqdm==4.64.1
 typing_extensions==4.4.0
 urllib3==1.26.12
