@@ -9,6 +9,8 @@ from s3ts.datasets.processing import acquire_dataset, compute_medoids, build_STS
 from s3ts.datasets.processing import discretize_STSs, shift_STSs_labels
 from s3ts.datasets.oesm import compute_OESMs
 
+from s3ts.tasks import common 
+
 from sklearn.model_selection import train_test_split
 
 # plotting
@@ -26,20 +28,13 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO,
 # Settings
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-DATASET_NAME = "GunPoint"
-# DATASET_NAME = "CBF"
-
-FORCE_DOWNLOAD = True
-
-MEDOID_TYPE = "dtw" # "dtw" or "euclidean"
-
 STS_NUMBER = 40
 STS_LENGTH = 10
 
 TEST_SIZE = 0.3
 
-BIN_NUMBER = 5
-SAMPLE_SHFT = -2
+BIN_NUMBER = 3
+SAMPLE_SHFT = -10
 
 RHO = 0.1
 
@@ -51,47 +46,16 @@ RANDOM_STATE = 0
 
 if __name__ == "__main__":
 
-    # define data folder
-    save_path = Path.cwd() / "data" / DATASET_NAME
-    save_path.mkdir(parents=True, exist_ok=True)
+    exp_path = common.prepare_experiment("prueba1")
 
-    # SHARED DATA FOR ALL TASKS       
-    #############################
+    common.prepare_dataset(
+        exp_path = exp_path,
+        dataset = "GunPoint",
+        test_size = 0.3)
 
-    save_file = save_path / "DB_shared.npz"
-    if FORCE_DOWNLOAD or not save_file.exists():
+    common.prepare_classification_data(
 
-        # grab the data
-        X, Y, mapping = acquire_dataset(DATASET_NAME)
-
-        # train-test split
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=TEST_SIZE, 
-                                            random_state=RANDOM_STATE, stratify=Y, shuffle=True)
-
-        # compute medoids 
-        medoids, medoid_ids = compute_medoids(X_train, Y_train, distance_type=MEDOID_TYPE)
-
-        # plot the medoids
-        img_folder = save_path / "images" / "medoids"
-        img_folder.mkdir(parents=True, exist_ok=True)
-        for i in range(medoids.shape[0]):
-            plt.figure(figsize=(6,6))
-            plt.title(f"Medoid of class {i}")
-            plt.plot(medoids[i])
-            plt.savefig(img_folder / f"medoid{i}.png")
-            plt.close()
-
-        # save everything to a file
-        np.savez_compressed(save_file,
-            X_train=X_train, Y_train=Y_train,
-            X_test=X_test, Y_test=Y_test,
-            medoids=medoids, medoids_ids=medoid_ids,
-            mapping=mapping, test_size=TEST_SIZE)
-    
-    else:
-
-        with np.load(save_file) as data:
-            X, Y, mapping = data["X"], data["Y"], data["mapping"] 
+    )
     
 
     # DATA FOR MAIN CLASSIFICATION TASK       

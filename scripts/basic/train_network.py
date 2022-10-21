@@ -11,14 +11,12 @@ import torch
 from s3ts.network.architecture import CNN_DTW, model_wrapper
 from s3ts.datasets.modules import ESM_DM
 
-from sklearn.model_selection import train_test_split
+# metrics
 from sklearn.metrics import classification_report
 
-# plotting
-import matplotlib.pyplot as plt
+import numpy as np
 import tqdm
 
-import numpy as np
 
 from pathlib import Path
 import warnings
@@ -33,8 +31,8 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO,
 # Settings
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-DATASET_NAME = "GunPoint"
-# DATASET_NAME = "CBF"
+# DATASET_NAME = "GunPoint"
+DATASET_NAME = "CBF"
 
 WINDOW_SIZE = 5
 
@@ -42,7 +40,7 @@ BATCH_SIZE = 128
 LEARNING_RATE = 5E-3
 MAX_EPOCHS = 15
 
-RESTART_PATH = "/home/rcoterillo/proyectos/ODTWFrames/s3ts/data/GunPoint/checkpoints/epoch=14-step=4920.ckpt"
+RESTART_PATH = "/home/rcoterillo/proyectos/ODTWFrames/s3ts/data/CBF/checkpoints/epoch=14-step=4200-v1.ckpt"
 
 NPROCS = 4
 
@@ -54,17 +52,19 @@ if __name__ == "__main__":
     save_path = Path.cwd() / "data" / DATASET_NAME
     save_path.mkdir(parents=True, exist_ok=True)
 
-    # create data module
-    dm = ESM_DM(save_path, window_size=WINDOW_SIZE, task="main-task",
+    # create data modules
+    dm_main = ESM_DM(save_path, window_size=WINDOW_SIZE, task="main-task",
                 batch_size=BATCH_SIZE, num_workers=NPROCS)
-    dm.prepare_data()
+
+    dm_aux = ESM_DM(save_path, window_size=WINDOW_SIZE, task="aux-task",
+                batch_size=BATCH_SIZE, num_workers=NPROCS)
 
     # create the model
     model = model_wrapper(
         model_architecture=CNN_DTW,
-        ref_size=dm.ds_train.ESMs.shape[2], # danger, esto era un 1
-        channels=dm.channels,
-        labels=dm.labels_size,
+        ref_size=dm_main.ds_train.ESMs.shape[2],
+        channels=dm_main.channels,
+        labels=dm_main.labels_size,
         window_size=WINDOW_SIZE,
         lr=LEARNING_RATE
     )
@@ -74,8 +74,17 @@ if __name__ == "__main__":
     lr_monitor = LearningRateMonitor(logging_interval='step')
     model_checkpoint = ModelCheckpoint(chkpt_path)
 
-    # Initialize a trainer
-    trainer = Trainer(
+    # Initialize trainers
+    trainer_main = Trainer(
+        default_root_dir=save_path,
+        callbacks=[lr_monitor, model_checkpoint],
+        max_epochs=MAX_EPOCHS,
+        check_val_every_n_epoch=1,
+        #progress_bar_refresh_rate=30,
+        deterministic=True,
+    )
+
+    trainer_aux = Trainer(
         default_root_dir=save_path,
         callbacks=[lr_monitor, model_checkpoint],
         max_epochs=MAX_EPOCHS,
@@ -85,19 +94,27 @@ if __name__ == "__main__":
     )
 
     if RESTART_PATH is None:
-        # Train the model ⚡
-        trainer.fit(model, datamodule=dm)
-        trainer.validate(model, datamodule=dm)
-        trainer.test(model, datamodule=dm)
-        path = chkpt_path / f"epoch={trainer.current_epoch -1}-step={trainer.global_step}.ckpt"
+
+        # Pretrain the model
+        # trainer_aux.fit(model, datamodule=dm_aux)
+        # trainer_aux.validate(model, datamodule=dm_aux)
+        # trainer_aux.test(model, datamodule=dm_aux)
+
+        # Train the model on main task
+        trainer_main.fit(model, datamodule=dm_main)
+        trainer_main.validate(model, datamodule=dm_main)
+        trainer_main.test(model, datamodule=dm_main)
+
+        path = chkpt_path / f"epoch={trainer_main.current_epoch-1}-step={trainer_main.global_step}.ckpt"
+
     else:
         path = RESTART_PATH
 
     model = model_wrapper.load_from_checkpoint(path,
                             model_architecture=CNN_DTW,
-                            ref_size=dm.ds_test.ESMs.shape[2],
-                            channels=dm.channels,
-                            labels=dm.labels_size,
+                            ref_size=dm_main.ds_test.ESMs.shape[2],
+                            channels=dm_main.channels,
+                            labels=dm_main.labels_size,
                             window_size=WINDOW_SIZE)
 
     model.eval()
@@ -105,11 +122,11 @@ if __name__ == "__main__":
 
     # evaluate network
     results_path = save_path / "results"
-    total_len = len(dm.ds_test)
+    total_len = len(dm_main.ds_test)
 
     y_pred = []
     y_true = []
-    predict_dataloader = dm.test_dataloader()
+    predict_dataloader = dm_main.test_dataloader()
 
     with torch.inference_mode():
         for i, (x, y) in tqdm.tqdm(enumerate(predict_dataloader), total=total_len // BATCH_SIZE):
@@ -122,7 +139,7 @@ if __name__ == "__main__":
     y_true = np.array(y_true)
 
     print('Classification Report')
-    target_names = [str(i) for i in range(dm.labels_size)]
+    target_names = [str(i) for i in range(dm_main.labels_size)]
     print(classification_report(y_true, np.argmax(y_pred, axis=-1)))
 
 

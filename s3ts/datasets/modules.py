@@ -99,8 +99,6 @@ class ESM_DM(pl.LightningDataModule):
         self.window_size = window_size
         self.task = task
 
-    def prepare_data(self) -> None:
-
         log.info(" ~ PREPARING DATA MODULE ~ ")
 
         log.info("Loading train data...")
@@ -139,7 +137,7 @@ class ESM_DM(pl.LightningDataModule):
         log.info("Creating test  dataset...")
         self.ds_test = ESM(ESMs=ESMs_test, labels=labels_test, window_size=self.window_size, transform=transform)
 
-        log.info(" ~ PREPARING DATA MODULE ~ ")
+        log.info(" ~ DATA MODULE PREPARED ~ ")        
 
     def train_dataloader(self):
         return DataLoader(self.ds_train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)

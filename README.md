@@ -2,33 +2,17 @@
 
 ## Environment / Setup
 
-Clone repo and move into folder
+
 ```bash
-git clone https://github.com/rcote98/s3ts.git
-cd s3ts
+git clone https://github.com/rcote98/s3ts.git   # clone the repo
+cd s3ts                                         # move in the folder
+python3 -m venv s3ts_env                        # create virtualenv
+source env/bin/activate                         # activate it
+pip install -r requirements.txt                 # install dependencies
+python -m pip install -e .                      # install dev package
 ```
 
-Create virtual envirnment
-```bash
-python3 -m venv env
-```
-
-Activate environment
-```bash
-source env/bin/activate
-```
-
-Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-Install _s3ts_ in development mode
-```bash
-python -m pip install -e .
-```
-
-## Usage
+## Usage / Scripts
 
 Download dataset from repository and prepare it.
 ```bash
@@ -39,3 +23,11 @@ Train neural network
 ```bash
 python3 scripts/train_network.py
 ```
+
+## TODO
+
+- Improve training set creation
+- Generalize task scheduling
+- Generalize model training / saving
+- Use longer STSs instead of more STSs / drop beggining of STS
+- Do some nice plots
