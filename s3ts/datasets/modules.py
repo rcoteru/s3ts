@@ -21,7 +21,7 @@ class ESM(Dataset):
             ESMs: np.ndarray, 
             labels: np.ndarray, 
             window_size: int = 5, 
-            windows_label: str = "last", # "last", "mode"
+            windows_label: str = "mode", # "last", "mode"
             transform = None, 
             target_transform = None):
 
@@ -40,7 +40,6 @@ class ESM(Dataset):
             labels = data['labels']
             ESMs = data['ESMs']
             STSs = data['STSs']
-
         return ESMs, labels, STSs
 
     def __len__(self):
@@ -64,10 +63,11 @@ class ESM(Dataset):
         wdw_idx = idx % n_samples_per_STS
 
         labels = self.labels[sts_idx, wdw_idx:wdw_idx + self.window_size]
-        window = self.ESMs[sts_idx, :, wdw_idx:wdw_idx + self.window_size, :]
+        window = self.ESMs[sts_idx, :, :, wdw_idx:wdw_idx + self.window_size]
+        window = np.moveaxis(window, 0, -1)
 
         if self.window_label == "last":     # pick the last label of the window
-            labels = labels.squeeze()[-1]   
+            label = labels.squeeze()[-1]   
         elif self.window_label == "mode":   # pick the most common label in the window
             label_counts = dict(Counter(labels))
             label = int(max(label_counts, key=label_counts.get))
@@ -103,10 +103,10 @@ class ESM_DM(pl.LightningDataModule):
 
         log.info(" ~ PREPARING DATA MODULE ~ ")
 
-        print("Loading train data...")
+        log.info("Loading train data...")
         ESMs_train, labels_train, _ = ESM.load_data(self.data_path / f"DB-train_{self.task}.npz")
 
-        print("Loading test data...")
+        log.info("Loading test data...")
         ESMs_test, labels_test, _ = ESM.load_data(self.data_path / f"DB-test_{self.task}.npz")
 
         log.info("Splitting validation set from test data...")

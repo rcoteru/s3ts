@@ -33,7 +33,7 @@ FORCE_DOWNLOAD = True
 
 MEDOID_TYPE = "dtw" # "dtw" or "euclidean"
 
-STS_NUMBER = 10
+STS_NUMBER = 40
 STS_LENGTH = 10
 
 TEST_SIZE = 0.3

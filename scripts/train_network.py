@@ -21,10 +21,12 @@ import tqdm
 import numpy as np
 
 from pathlib import Path
+import warnings
 import logging
 import sys
 
 seed_everything(0, workers=True)
+warnings.filterwarnings("ignore", category=UserWarning) 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                     format='%(asctime)s %(message)s')
 
@@ -40,7 +42,7 @@ BATCH_SIZE = 128
 LEARNING_RATE = 5E-3
 MAX_EPOCHS = 15
 
-RESTART_PATH = None
+RESTART_PATH = "/home/rcoterillo/proyectos/ODTWFrames/s3ts/data/GunPoint/checkpoints/epoch=14-step=4920.ckpt"
 
 NPROCS = 4
 
@@ -60,7 +62,7 @@ if __name__ == "__main__":
     # create the model
     model = model_wrapper(
         model_architecture=CNN_DTW,
-        ref_size=dm.ds_train.ESMs.shape[0], # danger, esto era un 1
+        ref_size=dm.ds_train.ESMs.shape[2], # danger, esto era un 1
         channels=dm.channels,
         labels=dm.labels_size,
         window_size=WINDOW_SIZE,
@@ -93,7 +95,7 @@ if __name__ == "__main__":
 
     model = model_wrapper.load_from_checkpoint(path,
                             model_architecture=CNN_DTW,
-                            ref_size=dm.ds_test.ESMs.shape[0],
+                            ref_size=dm.ds_test.ESMs.shape[2],
                             channels=dm.channels,
                             labels=dm.labels_size,
                             window_size=WINDOW_SIZE)
@@ -101,28 +103,27 @@ if __name__ == "__main__":
     model.eval()
     model.freeze()
 
-    # # evaluate network
-    # results_path = save_path / "results"
+    # evaluate network
+    results_path = save_path / "results"
+    total_len = len(dm.ds_test)
 
-    # total_len = len(dm.dtw_test)
+    y_pred = []
+    y_true = []
+    predict_dataloader = dm.test_dataloader()
 
-    # y_pred = []
-    # y_true = []
-    # predict_dataloader = dm.test_dataloader()
-
-    # with torch.inference_mode():
-    #     for i, (x, y) in tqdm(enumerate(predict_dataloader), total=total_len // batch_size):
-    #         #x = x.cuda()
-    #         raw_score = model(x)
-    #         y_pred.extend(raw_score.softmax(dim=-1).cpu().numpy())
-    #         y_true.extend(y.cpu().numpy())
+    with torch.inference_mode():
+        for i, (x, y) in tqdm.tqdm(enumerate(predict_dataloader), total=total_len // BATCH_SIZE):
+            #x = x.cuda()
+            raw_score = model(x)
+            y_pred.extend(raw_score.softmax(dim=-1).cpu().numpy())
+            y_true.extend(y.cpu().numpy())
     
-    # y_pred = np.array(y_pred)
-    # y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    y_true = np.array(y_true)
 
-    # print('Classification Report')
-    # target_names = [str(i) for i in range(dm.labels_size)]
-    # print(classification_report(y_true, np.argmax(y_pred, axis=-1)))
+    print('Classification Report')
+    target_names = [str(i) for i in range(dm.labels_size)]
+    print(classification_report(y_true, np.argmax(y_pred, axis=-1)))
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

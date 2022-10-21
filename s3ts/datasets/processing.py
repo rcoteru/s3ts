@@ -33,7 +33,8 @@ def acquire_dataset(dataset_name: str) -> None:
     log.info("DOWNLOAD FINISHED")
 
     try:
-        float(Y[0])
+        Y = Y.astype(int)
+        Y = Y - Y.min()
         mapping = None
     except ValueError:
         mapping = {k: v for v, k in enumerate(np.unique(Y))}

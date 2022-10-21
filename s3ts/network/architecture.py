@@ -8,6 +8,7 @@ import torch
 
 import numpy as np
 
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 class CNN_DTW(LightningModule):
@@ -16,33 +17,39 @@ class CNN_DTW(LightningModule):
         super().__init__()
 
         self.channels = channels
-        self.n_feature_maps = 32
 
+        # main parameter to tune network complexity
+        self.n_feature_maps = 32
+        self.kernel_size = 3
+
+        # convolutional part of the network
         self.model = nn.Sequential(
-            nn.Conv2d(in_channels=channels, out_channels=self.n_feature_maps // 2, kernel_size=3, padding='same'),
+            nn.Conv2d(in_channels=channels, out_channels=self.n_feature_maps // 2, 
+                kernel_size=self.kernel_size, padding='same'),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(in_channels=self.n_feature_maps // 2, out_channels=self.n_feature_maps,
-                      kernel_size=3, padding='same'),
+            nn.Conv2d(in_channels=self.n_feature_maps // 2, out_channels=self.n_feature_maps, 
+                kernel_size=self.kernel_size, padding='same'),
             nn.ReLU(),
             nn.AvgPool2d(2),
             nn.Dropout(0.35),
-            nn.Conv2d(in_channels=self.n_feature_maps, out_channels=self.n_feature_maps * 2,
-                      kernel_size=3, padding='same'),
+            nn.Conv2d(in_channels=self.n_feature_maps, out_channels=self.n_feature_maps * 2, 
+                kernel_size=self.kernel_size, padding='same'),
             nn.BatchNorm2d(num_features=self.n_feature_maps * 2),
             nn.ReLU(),
             nn.Dropout(0.4),
-            nn.Conv2d(in_channels=self.n_feature_maps * 2, out_channels=self.n_feature_maps * 4,
-                      kernel_size=3, padding='same'),
+            nn.Conv2d(in_channels=self.n_feature_maps * 2, out_channels=self.n_feature_maps * 4, 
+                kernel_size=self.kernel_size, padding='same'),
         )
-        self.linear_1 = self.dynamic_linear((1, channels, ref_size, window_size))
-        self.linear_2 = nn.Linear(in_features=self.n_feature_maps * 4, out_features=self.n_feature_maps * 8)
 
-    def dynamic_linear(self, image_dim):
-        x = torch.rand(*(image_dim))
-        features = self.model(x.float())
-        flat = features.view(features.size(0), -1)
-        return nn.Linear(in_features=flat.size(1), out_features=self.n_feature_maps * 4)
+        # calculate cnn output shape
+        image_dim = (1, channels, ref_size, window_size)
+        features = self.model(torch.rand(image_dim).float())
+        nfeats_after_conv = features.view(features.size(0), -1).size(1)
+
+        # linear part 
+        self.linear_1 = nn.Linear(in_features=nfeats_after_conv, out_features=self.n_feature_maps * 4)
+        self.linear_2 = nn.Linear(in_features=self.n_feature_maps * 4, out_features=self.n_feature_maps * 8)
 
     def get_output_shape(self):
         return self.n_feature_maps * 8
@@ -94,7 +101,9 @@ class model_wrapper(LightningModule):
     def _inner_step(self, x, y):
         logits = self(x)
         y_pred = logits.softmax(dim=-1)
-        loss = F.cross_entropy(logits, y)
+        target = F.one_hot(y, num_classes=self.labels)
+        target = target.type(torch.DoubleTensor)
+        loss = F.cross_entropy(logits, target)
         return loss, y_pred
 
     def training_step(self, batch, batch_idx):
@@ -111,6 +120,7 @@ class model_wrapper(LightningModule):
         self.log("train_loss", loss, sync_dist=True)
         self.log("train_accuracy", acc, prog_bar=True, sync_dist=True)
         self.log("train_f1", f1, prog_bar=True, sync_dist=True)
+
         return loss
 
     def configure_optimizers(self):

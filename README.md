@@ -15,12 +15,12 @@ python3 -m venv env
 
 Activate environment
 ```bash
-env/Scripts/activate.bat
+source env/bin/activate
 ```
 
 Install dependencies
 ```bash
-python -m venv venv
+pip install -r requirements.txt
 ```
 
 Install _s3ts_ in development mode
