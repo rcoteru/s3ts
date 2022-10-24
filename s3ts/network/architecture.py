@@ -8,7 +8,6 @@ import torch
 
 import numpy as np
 
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 class CNN_DTW(LightningModule):

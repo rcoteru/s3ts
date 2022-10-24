@@ -2,10 +2,13 @@
 Automation of the training tasks.
 """
 
+from pytorch_lightning.callbacks import LearningRateMonitor 
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning import Trainer, LightningModule
 
 from s3ts.datasets.modules import ESM_DM
 
+from pathlib import Path 
 import logging
 
 log = logging.Logger(__name__)
@@ -13,26 +16,42 @@ log = logging.Logger(__name__)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def run_sequence(
-        exp_path: Path,
-        seq_name: str,
-        main_task: tuple[str, ESM_DM],
-        aux_tasks: list[tuple[str, ESM_DM]],
-        model: LightningModule
-        ) -> None:
+    exp_path: Path,
+    seq_name: str,
+    main_task: tuple[str, ESM_DM],
+    aux_tasks: list[tuple[str, ESM_DM]],
+    model: LightningModule
+    ) -> None:
 
     seq_folder = exp_path / seq_name
+    seq_folder.mkdir(exist_ok=True, parents=True)
 
-    for task, task_dm in aux_tasks:
+    task_list = aux_tasks + [main_task]
+    for task_idx, (task, task_dm) in enumerate(task_list):
+
+        task_folder = seq_folder / task
+        task_folder.mkdir(exist_ok=True, parents=True)
+
+        lr_monitor = LearningRateMonitor(logging_interval='step')
+        model_checkpoint = ModelCheckpoint(task_folder, save_last=True)
+
+        trainer = Trainer(
+            default_root_dir=task_folder,
+            callbacks=[lr_monitor, model_checkpoint],
+            max_epochs=2, check_val_every_n_epoch=1,
+            deterministic = True)
+
+        trainer.fit(model, datamodule=task_dm)
+        trainer.validate(model, datamodule=task_dm)
+        trainer.test(model, datamodule=task_dm)
+
+        # if auxiliary task, move on
+        if task_idx + 1 != len(task_list):
+            continue
+
         pass
 
-    trainer_main = Trainer(
-        default_root_dir=save_path,
-        callbacks=[lr_monitor, model_checkpoint],
-        max_epochs=MAX_EPOCHS,
-        check_val_every_n_epoch=1,
-        #progress_bar_refresh_rate=30,
-        deterministic=True,
-    )
-
-
+def print_sequence_info(exp_path: Path, seq_name: str) -> None:
     pass
+
+    
