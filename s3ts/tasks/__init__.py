@@ -1,0 +1,5 @@
+
+data_folder = "data"
+
+base_main_fname = "base_data.npz"
+base_task_fname = "task_data.npz"

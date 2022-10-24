@@ -1,5 +1,3 @@
-from locale import windows_locale
-from tkinter import W
 from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 import torchvision as tv
@@ -7,6 +5,7 @@ import torchvision as tv
 from sklearn.model_selection import train_test_split
 
 from collections import Counter
+import multiprocessing as mp
 from pathlib import Path
 import numpy as np
 import logging
@@ -86,25 +85,21 @@ class ESM(Dataset):
 class ESM_DM(pl.LightningDataModule):
 
     def __init__(self, 
-            data_path: Path, 
-            task: str, 
+            target_file: Path, 
             window_size: int, 
-            batch_size: int = 32, 
-            num_workers: int = 4):
+            batch_size: int, 
+            ) -> None:
         
         super().__init__()
-        self.data_path = data_path
+        self.target_file = target_file
         self.batch_size = batch_size
-        self.num_workers = num_workers
         self.window_size = window_size
-        self.task = task
+        self.num_workers = mp.cpu_count()//2
 
         log.info(" ~ PREPARING DATA MODULE ~ ")
 
-        log.info("Loading train data...")
+        log.info("Loading data...")
         ESMs_train, labels_train, _ = ESM.load_data(self.data_path / f"DB-train_{self.task}.npz")
-
-        log.info("Loading test data...")
         ESMs_test, labels_test, _ = ESM.load_data(self.data_path / f"DB-test_{self.task}.npz")
 
         log.info("Splitting validation set from test data...")

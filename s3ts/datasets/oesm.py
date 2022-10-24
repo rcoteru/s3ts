@@ -240,15 +240,9 @@ def compute_OESM_distance_matrix(
     :param rho: memory
     :return: distance matrices
     """
-
-    
-
     # print('Computing ODTW distance matrix')
 
-    
-    
     init_width = 3
-
     oesm = OESM(pattern, rho, dist=dist)
     dtw_mat = np.zeros((len(pattern), len(STS)))
     dtw_mat[:,:init_width] = oesm.init_dist(STS[:init_width])
@@ -303,7 +297,41 @@ def compute_OESM_sc(
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def compute_OESMs(
+def compute_OESMs_parallel(
+        STSs: np.ndarray, 
+        patterns: np.ndarray,
+        rho: float,
+        nprocs: int = 4
+    ):
+
+    assert(len(STSs.shape) == 2)
+    n_STS = STSs.shape[0]
+
+    assert(len(patterns.shape) == 2)
+    n_patts = patterns.shape[0]
+    l_samp = patterns.shape[1]
+
+    scaled_rho = rho ** (1 / l_samp)
+
+    lock = mp.Manager().Lock()
+
+    # IDs to send to each process
+    STS_ids = np.arange(n_STS).tolist()
+
+    # INFO: "partial" basically makes "wrapper_compute" take only the data as argument
+    compute_OESM_sc_call = partial(compute_OESM_sc, STSs=STSs, patterns=patterns, 
+                                    rho=scaled_rho, lock=lock)
+
+    with mp.Pool(processes=nprocs) as pool:
+        full_DTWs = pool.map(compute_OESM_sc_call, STS_ids)
+
+    full_DTWs = np.array(full_DTWs)
+
+    return full_DTWs
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+def compute_OESM(
         STSs: np.ndarray, 
         patterns: np.ndarray,
         rho: float,
