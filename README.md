@@ -1,4 +1,4 @@
-# Self-Supervised Streaming TIme Series 
+# Self-Supervised Streaming Time Series 
 
 ## Environment / Setup
 
