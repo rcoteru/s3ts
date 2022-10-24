@@ -10,23 +10,10 @@ import s3ts
 import logging
 import sys
 
+s3ts.RANDOM_STATE = 0
 log = logging.Logger(__name__)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                     format='%(asctime)s %(message)s')
-
-# Settings
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-
-STS_NUMBER = 40
-STS_LENGTH = 10
-
-TEST_SIZE = 0.3
-RHO = 0.1
-
-PLOTS = False
-NPROCS = 4
-
-s3ts.RANDOM_STATE = 0
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
