@@ -12,11 +12,16 @@ pip install -r requirements.txt                 # install dependencies
 python -m pip install -e .                      # install dev package
 ```
 
+## Things to check
+- Influence of shifting labels in the pretrain
+- Performance with ratios of train/pretrain
+
 ## Ideas
 - Use artificial patterns alongside the good ones
+- Include data augmentation techniques
 
 ## TODO
 - Generalize model training / saving
-- Use longer STSs instead of more STSs / drop beggining of STS
-- Do some nice plots
-
+- Gather training stats automatically
+- Do some nice plotting
+- Multiseed checks
