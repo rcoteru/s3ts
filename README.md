@@ -12,24 +12,11 @@ pip install -r requirements.txt                 # install dependencies
 python -m pip install -e .                      # install dev package
 ```
 
-## Usage / Scripts
-
-Download dataset from repository and prepare it.
-```bash
-python3 scripts/prepare_data.py
-```
-
-Train neural network
-```bash
-python3 scripts/train_network.py
-```
+## Ideas
+- Use artificial patterns alongside the good ones
 
 ## TODO
-
 - Generalize model training / saving
 - Use longer STSs instead of more STSs / drop beggining of STS
 - Do some nice plots
 
-## IDEAS
-
-- Use artificial patterns alongside the good ones
