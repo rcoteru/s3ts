@@ -21,10 +21,15 @@ def run_sequence(
     main_task: tuple[str, ESM_DM],
     aux_tasks: list[tuple[str, ESM_DM]],
     model: LightningModule
-    ) -> None:
+    ) -> LightningModule:
 
     seq_folder = exp_path / seq_name
     seq_folder.mkdir(exist_ok=True, parents=True)
+
+    # if main task is finished, just load it
+    target_file = seq_folder / main_task[0] / "last.ckpt"
+    if target_file.exists():
+        return target_file
 
     task_list = aux_tasks + [main_task]
     for task_idx, (task, task_dm) in enumerate(task_list):
@@ -38,7 +43,7 @@ def run_sequence(
         trainer = Trainer(
             default_root_dir=task_folder,
             callbacks=[lr_monitor, model_checkpoint],
-            max_epochs=2, check_val_every_n_epoch=1,
+            max_epochs=10, check_val_every_n_epoch=1,
             deterministic = True)
 
         trainer.fit(model, datamodule=task_dm)
@@ -51,7 +56,16 @@ def run_sequence(
 
         pass
 
-def print_sequence_info(exp_path: Path, seq_name: str) -> None:
+    target_file = seq_folder / main_task[0] / "last.ckpt"
+    return target_file
+
+def print_task_info(
+        exp_path: Path, 
+        seq_name: str, 
+        main_task: tuple[str, ESM_DM]
+        ) -> None:
+
+
     pass
 
     

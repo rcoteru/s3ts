@@ -8,7 +8,8 @@ import numpy as np
 
 import logging
 
-rng = np.random.default_rng(seed=0)
+from s3ts import RANDOM_STATE
+rng = np.random.default_rng(seed=RANDOM_STATE)
 log = logging.Logger(__name__)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -81,11 +82,10 @@ def compute_medoids(
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def build_STSs(
+def build_STS(
         X: np.ndarray, 
         Y: np.ndarray, 
-        samples_per_sts: int,
-        number_of_sts: int = 1,
+        sts_length: int,
         skip_ids: list[int] = [],
         aug_jitter: float = 0,
         aug_scaling: float = 0,
@@ -98,43 +98,41 @@ def build_STSs(
 
     assert(len(X.shape) == 2)
     s_length = X.shape[1]
-    sts_length = samples_per_sts*s_length
 
-    STSs_X = np.empty((number_of_sts, sts_length))
-    STSs_Y = np.empty((number_of_sts,sts_length))
+    STS_X = np.empty(sts_length*s_length)
+    STS_Y = np.empty(sts_length*s_length)
 
-    for nsts in range(number_of_sts):
-        for r in range(samples_per_sts):
+    for r in range(sts_length):
 
-            while True:
-                random_idx = rng.integers(0, nsamples)
-                if random_idx in skip_ids:
-                    continue
-                else:
-                    break
+        while True:
+            random_idx = rng.integers(0, nsamples)
+            if random_idx in skip_ids:
+                continue
+            else:
+                break
 
-            sample = X[random_idx,:].copy()
-            label = Y[random_idx]
+        sample = X[random_idx,:].copy()
+        label = Y[random_idx]
 
-            # TODO implement augmentations
-            if rng.random() <= aug_jitter:
-                sample = sample
-            if rng.random() <= aug_scaling:
-                sample = sample
-            if rng.random() <= aug_time_warp:
-                sample = sample
-            if rng.random() <= aug_window_warp:
-                sample = sample
+        # TODO implement augmentations
+        if rng.random() <= aug_jitter:
+            sample = sample
+        if rng.random() <= aug_scaling:
+            sample = sample
+        if rng.random() <= aug_time_warp:
+            sample = sample
+        if rng.random() <= aug_window_warp:
+            sample = sample
 
-            STSs_X[nsts, r*s_length:(r+1)*s_length] = sample
-            STSs_Y[nsts, r*s_length:(r+1)*s_length] = label
+        STS_X[r*s_length:(r+1)*s_length] = sample
+        STS_Y[r*s_length:(r+1)*s_length] = label
 
-    return STSs_X, STSs_Y
+    return STS_X, STS_Y
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def discretize_STSs(
-        STSs: np.ndarray,
+def discretize_TS(
+        TS: np.ndarray,
         intervals: int, 
         strategy: str = "quantile", # uniform (width) / quantile (freq) 
         random_state: int = 0
@@ -142,31 +140,43 @@ def discretize_STSs(
 
     kbd = KBinsDiscretizer(n_bins=intervals, encode="ordinal",
             strategy=strategy, random_state=random_state)
-
-    kbd.fit(STSs)
+    kbd.fit(TS)
     
-    return kbd.transform(STSs)
+    return kbd.transform(TS), kbd
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def shift_STSs_labels(
-        STSs_X: np.ndarray,
-        STSs_Y: np.ndarray,
+def shift_labels(
+        labels: np.ndarray,
+        OESM: np.ndarray,
+        STS: np.ndarray,
         shift: int, 
-        ) -> tuple[np.ndarray, np.ndarray]:
+        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
-    sts_length = STSs_X.shape[1]
-    STSs_Xd = np.copy(STSs_X)
+    if shift == 0:
+        return labels, OESM, STS
+
+    sts_length = labels.shape[0]
+    STS_d = np.copy(STS)
+    OESM_d = np.copy(OESM)
 
     if shift < 0:
-        STSs_Yd = np.roll(STSs_Y, shift, axis=1).copy()
-        STSs_Xd = np.delete(STSs_Xd, np.arange(sts_length+shift, sts_length), axis=1)
-        STSs_Yd = np.delete(STSs_Yd, np.arange(sts_length+shift, sts_length), axis=1)
+
+        labels_d = np.roll(labels, shift, axis=0).copy()
+        labels_d = np.delete(labels_d, np.arange(sts_length+shift, sts_length), axis=0)
+        OESM_d = np.delete(OESM_d, np.arange(sts_length+shift, sts_length), axis=2)
+        STS_d = np.delete(STS_d, np.arange(sts_length+shift, sts_length), axis=0)
+
     elif shift > 0:
-        STSs_Yd = np.roll(STSs_Y, shift, axis=1).copy()
-        STSs_Xd = np.delete(STSs_Xd, np.arange(shift), axis=1)
-        STSs_Yd = np.delete(STSs_Yd, np.arange(shift), axis=1)
+
+        labels_d = np.roll(labels, shift, axis=0).copy()
+        labels_d = np.delete(labels_d, np.arange(shift), axis=0)
+        OESM_d = np.delete(OESM_d, np.arange(shift), axis=2)
+        STS_d = np.delete(STS_d, np.arange(shift), axis=0)
+
     else: 
-        STSs_Yd = np.copy(STSs_Y)
+        raise NotImplementedError()
+
+    return labels_d, OESM_d, STS_d
+        
     
-    return STSs_Xd, STSs_Yd

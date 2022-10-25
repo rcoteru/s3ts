@@ -4,70 +4,107 @@
 """
 
 from s3ts.network.architecture import model_wrapper, CNN_DTW
-from s3ts import tasks
+from s3ts.tasks import data, train
 import s3ts
 
+from copy import deepcopy
 import logging
-import sys
 
 s3ts.RANDOM_STATE = 0
 log = logging.Logger(__name__)
-logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-                    format='%(asctime)s %(message)s')
+logging.basicConfig(level=logging.INFO)
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+EXPERIMENT = "prueba"
+DATASET = "GunPoint"
+
+TEST_SIZE = 0.3
+
+WINDOW_SIZE = 5
+BATCH_SIZE  = 128
+LEARNING_RATE = 1E-5
+
+MAIN_STS_LENGTH = 20
+AUX_STS_LENGTH  = 200
+
+N_SHIFTS = 10
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 if __name__ == "__main__":
 
     # create experiment folder
-    exp_path = tasks.data.prepare_experiment("prueba")
+    exp_path = data.prepare_experiment(EXPERIMENT)
 
     # download dataset
-    tasks.data.prepare_dataset(
+    data.prepare_dataset(
         exp_path = exp_path,
-        dataset = "GunPoint",
-        test_size = 0.3,
+        dataset = DATASET,
+        test_size = TEST_SIZE,
         force = False)
+
+    # PREPARE THE TASKS
+    ###########################################
 
     # prepare classification data for main task
-    dm_main = tasks.data.prepare_classification_data(
-        exp_path = exp_path,
-        task_name = "main",
-        sts_length = 10,
-        label_type = "original",
-        label_shft = 0,
-        batch_size = 128,
-        wndow_size = 5,
-        force = False)
+    main_task = ("main", 
+        data.prepare_classification_data(
+            exp_path = exp_path,
+            task_name = "main",
+            sts_length = MAIN_STS_LENGTH,
+            label_type = "original",
+            label_shft = 0,
+            batch_size = BATCH_SIZE,
+            wndow_size = WINDOW_SIZE,
+            force = False))
 
-    # prepare classification data for aux task
-    dm_aux = tasks.data.prepare_classification_data(
-        exp_path = exp_path,
-        task_name = "aux",
-        sts_length = 200,
-        label_type = "discrete_STS",
-        label_shft = 0,
-        batch_size = 128,
-        wndow_size = 5,
-        force = False)
+    # prepare classification data for auxiliary tasks
+    aux_tasks = []
+    for i in range(N_SHIFTS):
+        auxt = (f"aux{i}",
+            data.prepare_classification_data(
+                exp_path = exp_path,
+                task_name = "aux",
+                sts_length = AUX_STS_LENGTH,
+                label_type = "discrete_STS",
+                label_shft = -i,
+                batch_size = BATCH_SIZE,
+                wndow_size = WINDOW_SIZE,
+                force = False))
+        aux_tasks.append(auxt)
+
+
+    # CREATE THE MODELS
+    ###########################################
+
+    ref_size = main_task[1].ds_train.OESM.shape[1]
+    channels = main_task[1].channels
+    nlabels = main_task[1].labels_size
 
     # create the model
-    model = model_wrapper(
-        model_architecture=CNN_DTW,
-        ref_size=dm_main.ds_train.ESMs.shape[2],
-        channels=dm_main.channels,
-        labels=dm_main.labels_size,
-        window_size=5,
-        lr=1e-5
-    )
+    default_model = model_wrapper(model_architecture=CNN_DTW,
+        ref_size=ref_size,channels=channels, labels=nlabels,
+        window_size=WINDOW_SIZE, lr=LEARNING_RATE)
+    pretrain_model = deepcopy(default_model)
 
-    # run the sequence
-    tasks.train.run_sequence(
+    # RUN THE SEQUENCES
+    ###########################################
+
+    # run the default sequence
+    normal_model_path = train.run_sequence(
+        exp_path = exp_path,
+        seq_name = "default",
+        main_task = main_task,
+        aux_tasks = [],
+        model = default_model)
+
+     # run the pretrain sequence
+    pretrain_model_path = train.run_sequence(
         exp_path = exp_path,
         seq_name = "pretrain",
-        main_task = ("main", dm_main)
-        aux_tasks = [("aux", dm_aux)]
-        model = model
-    )
-
+        main_task = main_task,
+        aux_tasks = aux_tasks,
+        model = pretrain_model)
+    
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

@@ -2,7 +2,7 @@ from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 import torchvision as tv
 
-from sklearn.model_selection import train_test_split
+from s3ts.datasets.processing import shift_labels
 
 from collections import Counter
 import multiprocessing as mp
@@ -17,7 +17,7 @@ log = logging.Logger(__name__)
 class ESM(Dataset):
 
     def __init__(self, 
-            ESMs: np.ndarray, 
+            OESM: np.ndarray, 
             labels: np.ndarray, 
             window_size: int = 5, 
             windows_label: str = "mode", # "last", "mode"
@@ -25,7 +25,7 @@ class ESM(Dataset):
             target_transform = None):
 
         self.labels = labels
-        self.ESMs = ESMs
+        self.OESM = OESM
 
         self.window_size = window_size
         self.window_label = windows_label
@@ -34,35 +34,41 @@ class ESM(Dataset):
         self.target_transform = target_transform
 
     @staticmethod
-    def load_data(path):
+    def load_data(path, mode: str):
+        
         with np.load(path, 'r') as data:
-            labels = data['labels']
-            ESMs = data['ESMs']
-            STSs = data['STSs']
-        return ESMs, labels, STSs
+            if mode == "train":
+                labels = data['labels_train']
+                OESM = data['OESM_train']
+                STS = data['STS_train']
+            elif mode == "test":
+                labels = data['labels_train']
+                OESM = data['OESM_train']
+                STS = data['STS_train']
+
+        return OESM, labels, STS
 
     def __len__(self):
 
         """ Return the number of samples in the dataset. """
         
-        number_of_STSs = self.labels.shape[0]
-        STS_length = self.labels.shape[1]
-        n_samples_per_STS = STS_length + 1 - self.window_size
+        STS_length = len(self.labels)
+        n_samples_STS = STS_length + 1 - self.window_size
 
-        return n_samples_per_STS * number_of_STSs
+        return n_samples_STS
 
     def __getitem__(self, idx: int) -> tuple[np.ndarray, int]:
 
         """ Return an entry (data, label) from the dataset. """
 
-        STS_length = self.labels.shape[1]
-        n_samples_per_STS = STS_length + 1 - self.window_size
+        STS_length = self.labels.shape[0]
+        n_samples_STS = STS_length + 1 - self.window_size
 
-        sts_idx = idx // n_samples_per_STS
-        wdw_idx = idx % n_samples_per_STS
+        # sts_idx = idx // n_samples_per_STS
+        wdw_idx = idx % n_samples_STS
 
-        labels = self.labels[sts_idx, wdw_idx:wdw_idx + self.window_size]
-        window = self.ESMs[sts_idx, :, :, wdw_idx:wdw_idx + self.window_size]
+        labels = self.labels[wdw_idx:wdw_idx + self.window_size]
+        window = self.OESM[:, :, wdw_idx:wdw_idx + self.window_size]
         window = np.moveaxis(window, 0, -1)
 
         if self.window_label == "last":     # pick the last label of the window
@@ -88,6 +94,7 @@ class ESM_DM(pl.LightningDataModule):
             target_file: Path, 
             window_size: int, 
             batch_size: int, 
+            label_shft: int = 0
             ) -> None:
         
         super().__init__()
@@ -99,38 +106,39 @@ class ESM_DM(pl.LightningDataModule):
         log.info(" ~ PREPARING DATA MODULE ~ ")
 
         log.info("Loading data...")
-        ESMs_train, labels_train, _ = ESM.load_data(self.data_path / f"DB-train_{self.task}.npz")
-        ESMs_test, labels_test, _ = ESM.load_data(self.data_path / f"DB-test_{self.task}.npz")
+        OESM_train, labels_train,  STS_train = ESM.load_data(self.target_file, mode="train")
+        OESM_test, labels_test,  STS_test = ESM.load_data(self.target_file, mode="test")
+
+        # shift labels if needed
+        labels_train, OESM_train, STS_train = shift_labels(labels_train, OESM_train, STS_train, shift=label_shft)
+        labels_test, OESM_test, STS_test = shift_labels(labels_test, OESM_test, STS_test, shift=label_shft)
 
         log.info("Splitting validation set from test data...")
-
-        n_samples_test = ESMs_test.shape[0]
-        val_idxs, test_idxs = train_test_split(range(n_samples_test), train_size=0.5, test_size=0.5)
-
-        ESMs_val , labels_val = ESMs_test[val_idxs], labels_test[val_idxs]
-        ESMs_test, labels_test = ESMs_test[test_idxs], labels_test[test_idxs]
+        STS_length = len(labels_test)
+        OESM_val , labels_val =  OESM_test[:,:,STS_length//2:], labels_test[STS_length//2:]
+        OESM_test, labels_test = OESM_test[:,:,:STS_length//2], labels_test[:STS_length//2]
 
         self.labels_size = len(np.unique(labels_train)) # number of labels
-        self.channels = ESMs_train.shape[1]             # number of patterns
+        self.channels = OESM_train.shape[0]             # number of patterns
 
-        log.info("       Train shape:", ESMs_train.shape)
-        log.info("         Val shape:", ESMs_val.shape)
-        log.info("        Test shape:", ESMs_test.shape)
+        log.info("       Train shape:", OESM_train.shape)
+        log.info("         Val shape:", OESM_val.shape)
+        log.info("        Test shape:", OESM_test.shape)
         log.info("  Number of labels:", self.labels_size)
         log.info("Number of patterns:", self.channels)
 
         log.info("Normalizing data...")
-        avg, std = np.average(ESMs_train), np.std(ESMs_train)
+        avg, std = np.average(OESM_train), np.std(OESM_train)
         transform = tv.transforms.Compose([tv.transforms.ToTensor(), tv.transforms.Normalize((avg,), (std,))])
 
         log.info("Creating train dataset...")
-        self.ds_train = ESM(ESMs=ESMs_train, labels=labels_train, window_size=self.window_size,transform=transform)
+        self.ds_train = ESM(OESM=OESM_train, labels=labels_train, window_size=self.window_size,transform=transform)
 
         log.info("Creating val   dataset...")
-        self.ds_val = ESM(ESMs=ESMs_val, labels=labels_val, window_size=self.window_size, transform=transform)
+        self.ds_val = ESM(OESM=OESM_val, labels=labels_val, window_size=self.window_size, transform=transform)
 
         log.info("Creating test  dataset...")
-        self.ds_test = ESM(ESMs=ESMs_test, labels=labels_test, window_size=self.window_size, transform=transform)
+        self.ds_test = ESM(OESM=OESM_test, labels=labels_test, window_size=self.window_size, transform=transform)
 
         log.info(" ~ DATA MODULE PREPARED ~ ")        
 

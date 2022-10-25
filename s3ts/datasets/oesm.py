@@ -261,104 +261,48 @@ def compute_OESM_distance_matrix(
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def compute_OESM_sc(
-        sts_idx: np.ndarray, 
-        STSs: np.ndarray, 
+        patt_idx: np.ndarray, 
+        STS: np.ndarray, 
         patterns: np.ndarray, 
         rho: float,
-        lock: mp.Lock, 
     ):
 
-    sts_length = STSs.shape[1]
-    n_patts = patterns.shape[0]
+    sts_length = STS.shape[0]
     patt_length = patterns.shape[1]
 
-    # Initialize progress bar
-    with lock:
-        bar = tqdm(
-            desc=f'STS_{sts_idx}',
-            total=n_patts,
-            position=sts_idx,
-            leave=True
-        )
+    partial_OESM = np.zeros((patt_length, sts_length))
+    partial_OESM = compute_OESM_distance_matrix(pattern=patterns[patt_idx], 
+            STS=STS, rho=rho, dist="euclidean")
 
-    partial_ESM = np.zeros((n_patts, patt_length, sts_length))
-
-    for patt_idx in range(n_patts):
-        partial_ESM[patt_idx, :, :] = compute_OESM_distance_matrix(
-            pattern=patterns[patt_idx], STS=STSs[sts_idx], 
-            rho=rho, dist="euclidean")
-        with lock: # Update the progress bar
-            bar.update(1)
-
-    with lock:  # Close progress bar
-        bar.close()
-
-    return partial_ESM
+    return partial_OESM
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def compute_OESMs_parallel(
-        STSs: np.ndarray, 
+def compute_OESM_parallel(
+        STS: np.ndarray, 
         patterns: np.ndarray,
         rho: float,
         nprocs: int = 4
     ):
 
-    assert(len(STSs.shape) == 2)
-    n_STS = STSs.shape[0]
-
+    assert(len(STS.shape) == 1)
     assert(len(patterns.shape) == 2)
     n_patts = patterns.shape[0]
     l_samp = patterns.shape[1]
 
     scaled_rho = rho ** (1 / l_samp)
 
-    lock = mp.Manager().Lock()
-
     # IDs to send to each process
-    STS_ids = np.arange(n_STS).tolist()
+    patt_ids = np.arange(n_patts).tolist()
 
     # INFO: "partial" basically makes "wrapper_compute" take only the data as argument
-    compute_OESM_sc_call = partial(compute_OESM_sc, STSs=STSs, patterns=patterns, 
-                                    rho=scaled_rho, lock=lock)
+    compute_OESM_sc_call = partial(compute_OESM_sc, STS=STS, patterns=patterns, rho=scaled_rho)
 
     with mp.Pool(processes=nprocs) as pool:
-        full_DTWs = pool.map(compute_OESM_sc_call, STS_ids)
+        full_OESM = pool.map(compute_OESM_sc_call, patt_ids)
 
-    full_DTWs = np.array(full_DTWs)
+    full_OESM = np.array(full_OESM)
 
-    return full_DTWs
+    return full_OESM
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-
-def compute_OESM(
-        STSs: np.ndarray, 
-        patterns: np.ndarray,
-        rho: float,
-        nprocs: int = 4
-    ):
-
-    assert(len(STSs.shape) == 2)
-    n_STS = STSs.shape[0]
-
-    assert(len(patterns.shape) == 2)
-    n_patts = patterns.shape[0]
-    l_samp = patterns.shape[1]
-
-    scaled_rho = rho ** (1 / l_samp)
-
-    lock = mp.Manager().Lock()
-
-    # IDs to send to each process
-    STS_ids = np.arange(n_STS).tolist()
-
-    # INFO: "partial" basically makes "wrapper_compute" take only the data as argument
-    compute_OESM_sc_call = partial(compute_OESM_sc, STSs=STSs, patterns=patterns, 
-                                    rho=scaled_rho, lock=lock)
-
-    with mp.Pool(processes=nprocs) as pool:
-        full_DTWs = pool.map(compute_OESM_sc_call, STS_ids)
-
-    full_DTWs = np.array(full_DTWs)
-
-    return full_DTWs
