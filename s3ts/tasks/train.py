@@ -6,6 +6,10 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning import Trainer, LightningModule
 
+import numpy as np
+import torch
+import tqdm
+
 from s3ts.datasets.modules import ESM_DM
 
 from pathlib import Path 
@@ -59,11 +63,25 @@ def run_sequence(
     target_file = seq_folder / main_task[0] / "last.ckpt"
     return target_file
 
-def print_task_info(
+def get_task_stats(
         exp_path: Path, 
         seq_name: str, 
-        main_task: tuple[str, ESM_DM]
+        task: tuple[str, ESM_DM],
+        model: LightningModule
         ) -> None:
+
+    y_pred = []
+    y_true = []
+    test_data = task[1].test_dataloader()
+
+    with torch.inference_mode():
+        for _, (x, y) in tqdm(enumerate(test_data), total=len(test_data) // task[1].batch_size):
+            raw_score = model(x)
+            y_pred.extend(raw_score.softmax(dim=-1).cpu().numpy())
+            y_true.extend(y.cpu().numpy())
+    
+    y_pred = np.array(y_pred)
+    y_true = np.array(y_true)
 
 
     pass

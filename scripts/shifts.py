@@ -1,4 +1,6 @@
 """
+Run the main classification task alongside in two scenarios: 
+alone and with shifted discrete label pretrains.
 
 @author Raúl Coterillo
 """
@@ -14,6 +16,7 @@ s3ts.RANDOM_STATE = 0
 log = logging.Logger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+# User Settings
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 EXPERIMENT = "prueba"
@@ -28,7 +31,7 @@ LEARNING_RATE = 1E-5
 MAIN_STS_LENGTH = 20
 AUX_STS_LENGTH  = 200
 
-N_SHIFTS = 10
+SHIFTS = [10]
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
@@ -47,7 +50,7 @@ if __name__ == "__main__":
     # PREPARE THE TASKS
     ###########################################
 
-    # prepare classification data for main task
+    # prepare main task
     main_task = ("main", 
         data.prepare_classification_data(
             exp_path = exp_path,
@@ -59,13 +62,13 @@ if __name__ == "__main__":
             wndow_size = WINDOW_SIZE,
             force = False))
 
-    # prepare classification data for auxiliary tasks
+    # prepare auxiliary tasks
     aux_tasks = []
-    for i in range(N_SHIFTS):
-        auxt = (f"aux{i}",
+    for i in SHIFTS:
+        auxt = (f"shift_{i}",
             data.prepare_classification_data(
                 exp_path = exp_path,
-                task_name = "aux",
+                task_name = "shift",
                 sts_length = AUX_STS_LENGTH,
                 label_type = "discrete_STS",
                 label_shft = -i,
@@ -73,7 +76,6 @@ if __name__ == "__main__":
                 wndow_size = WINDOW_SIZE,
                 force = False))
         aux_tasks.append(auxt)
-
 
     # CREATE THE MODELS
     ###########################################

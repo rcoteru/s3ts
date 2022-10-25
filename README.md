@@ -26,8 +26,10 @@ python3 scripts/train_network.py
 
 ## TODO
 
-- Improve training set creation
-- Generalize task scheduling
 - Generalize model training / saving
 - Use longer STSs instead of more STSs / drop beggining of STS
 - Do some nice plots
+
+## IDEAS
+
+- Use artificial patterns alongside the good ones
