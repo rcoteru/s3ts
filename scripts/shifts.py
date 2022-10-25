@@ -31,7 +31,7 @@ LEARNING_RATE = 1E-5
 MAIN_STS_LENGTH = 20
 AUX_STS_LENGTH  = 200
 
-SHIFTS = [10]
+SHIFTS = [0]
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     ###########################################
 
     # run the default sequence
-    normal_model_path = train.run_sequence(
+    default_model_path = train.run_sequence(
         exp_path = exp_path,
         seq_name = "default",
         main_task = main_task,
