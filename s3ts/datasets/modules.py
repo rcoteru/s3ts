@@ -1,5 +1,5 @@
 from torch.utils.data import Dataset, DataLoader
-import pytorch_lightning as pl
+from pytorch_lightning import LightningDataModule
 import torchvision as tv
 
 from s3ts.datasets.processing import shift_labels
@@ -88,7 +88,7 @@ class ESM(Dataset):
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-class ESM_DM(pl.LightningDataModule):
+class ESM_DM(LightningDataModule):
 
     def __init__(self, 
             target_file: Path, 

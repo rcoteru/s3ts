@@ -33,6 +33,11 @@ AUX_STS_LENGTH  = 200
 
 SHIFTS = [0]
 
+AUX_TASKS = [
+    # name, type, settings
+    ("ae", "ae", ()),
+]
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 if __name__ == "__main__":
