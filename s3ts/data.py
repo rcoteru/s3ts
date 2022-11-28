@@ -5,14 +5,6 @@ Data acquisition and preprocessing for the neural network.
 @author Raúl Coterillo
 """
 
-# torch
-from torch.utils.data import Dataset, DataLoader
-from pytorch_lightning import LightningDataModule
-import torchvision as tv
-
-# numpy
-import numpy as np
-
 # standard library
 from __future__ import annotations
 from dataclasses import dataclass
@@ -21,9 +13,21 @@ import multiprocessing as mp
 from pathlib import Path
 import logging
 
+# external imports
+from torch.utils.data import Dataset, DataLoader
+from pytorch_lightning import LightningDataModule
+import torchvision as tv
+import numpy as np
+
+# package imports
+from s3ts.data_aux import acquire_dataset
+
 from s3ts import RANDOM_STATE
 rng = np.random.default_rng(seed=RANDOM_STATE)
 log = logging.Logger(__name__)
+
+data_folder = "data"
+image_folder = "images"
 
 @dataclass
 class AuxTasksParams:
@@ -100,7 +104,7 @@ class ScalarLabelsDataset(Dataset):
         if self.target_transform:
             label = self.target_transform(label)
 
-        return x, y
+        return window, labels
 
 # ========================================================= #
 #                  PYTORCH DATAMODULE                       #
@@ -109,18 +113,24 @@ class ScalarLabelsDataset(Dataset):
 class STSDataModule(LightningDataModule):
 
     def __init__(self, 
+            experiment_name: str,
             dataset_name: str, 
             window_size: int, 
             aux_patterns: list[function],
             tasks: AuxTasksParams,
             batch_size: int, 
             patt_length: int = None,
-
             ) -> None:
         
         super().__init__()
 
 
+        # create output folder
+        save_path = Path.cwd() / data_folder / exp_name
+        log.info(f"Creating experiment '{exp_name}' in {save_path}")
+        save_path.mkdir(parents=True, exist_ok=exists_ok)
+
+        # assign whatever variables
         self.target_file = target_file
         self.batch_size = batch_size
         self.window_size = window_size
@@ -164,6 +174,107 @@ class STSDataModule(LightningDataModule):
         # self.ds_test = ESM(OESM=OESM_test, labels=labels_test, window_size=self.window_size, transform=transform)
 
         # log.info(" ~ DATA MODULE PREPARED ~ ")  
+
+    def __download_dataset(self):
+
+        # grab the data 
+        X, Y, mapping = acquire_dataset(dataset)
+        n_labels = len(np.unique(Y))
+
+        # train-test split
+        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_size, 
+                random_state=RANDOM_STATE, stratify=Y, shuffle=True)
+
+        # compute medoids 
+        medoids, medoid_ids = compute_medoids(X_train, Y_train, distance_type=medoid_type)
+        
+        # plot the medoids
+        img_folder = exp_path / "images" / "medoids"
+        img_folder.mkdir(parents=True, exist_ok=True)
+        for i in range(medoids.shape[0]):
+            plt.figure(figsize=(6,6))
+            plt.title(f"Medoid of class {i}")
+            plt.plot(medoids[i])
+            plt.savefig(img_folder / f"medoid{i}.png")
+            plt.close()
+
+        # save everything to a file
+        np.savez_compressed(base_file, 
+            X_train=X_train, Y_train=Y_train,
+            X_test=X_test, Y_test=Y_test,
+            medoids=medoids, medoid_ids=medoid_ids,
+            mapping=mapping, test_size=test_size, 
+            n_labels=n_labels)
+
+    def __generate_shared_data(
+            exp_path: Path,
+            task_name: str,
+            sts_length: int,
+            label_type: str,
+            label_shft: int,
+            rho_memory: float = 0.1,
+            batch_size: int = 128,
+            wndow_size: int = 5,
+            force: bool = False
+            ) -> None:
+
+        log.info(f"Generating classification data for task '{task_name}' in '{exp_path.name}' ...")
+        target_file = exp_path / f"{task_name}_{base_task_fname}"
+
+        # load datamodule if calculation is not needed
+        if not (force or not target_file.exists()):
+            return ESM_DM(target_file, window_size=wndow_size, batch_size=batch_size, label_shft=label_shft)
+
+        # load experiment data
+        base_file = exp_path / base_main_fname
+        with np.load(base_file) as data:
+            medoids, medoid_ids = data["medoids"], data["medoid_ids"]
+            X_train, Y_train = data["X_train"], data["Y_train"]
+            X_test,  Y_test  = data["X_test"], data["Y_test"]
+            n_labels = data["n_labels"]
+
+        # calculate labels
+        if label_type == "original":
+            Y_train = Y_train
+            Y_test = Y_test
+        elif label_type == "discrete_STS":
+            Y_train, kbd = discretize_TS(X_train, intervals=int(n_labels), strategy="quantile")
+            
+            # kbd = KBinsDiscretizer(n_bins=intervals, encode="ordinal",
+            # strategy=strategy, random_state=random_state)
+            # kbd.fit(TS)
+            
+            # return kbd.transform(TS)
+
+            Y_test = kbd.transform(X_test)
+        else:
+            raise NotImplementedError(f"Unknown label type: '{label_type}'")
+
+        # create train STS from samples
+        STS_train, labels_train = build_STS(X=X_train, Y=Y_train, 
+            sts_length=sts_length, skip_ids=medoid_ids,
+            aug_jitter = 0, aug_time_warp = 0, 
+            aug_scaling = 0, aug_window_warp = 0) 
+        
+        # create test STS from samples
+        # TODO hacer que no sea aleatorio, longitud tamaño test
+        STS_test, labels_test = build_STS(X=X_train, Y=Y_train, 
+            sts_length=sts_length)   
+
+        # compute the OESM
+        OESM_train = compute_OESM_parallel(STS_train, patterns = medoids, rho=rho_memory)
+        OESM_test = compute_OESM_parallel(STS_test, patterns = medoids, rho=rho_memory)
+
+        # save the data
+        np.savez_compressed(target_file, 
+            STS_train = STS_train, STS_test = STS_test,
+            labels_train = labels_train, labels_test = labels_test,
+            OESM_train = OESM_train, OESM_test = OESM_test)
+
+    def __generate_discrete_labels():
+
+
+        pass
 
     def train_dataloader(self):
         return DataLoader(self.ds_train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)

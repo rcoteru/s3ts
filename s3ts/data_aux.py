@@ -35,14 +35,20 @@ class AugProbabilites:
     time_warp:   float = 0
     window_warp: float = 0
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
 def jitter(x, sigma=0.03):
     # https://arxiv.org/pdf/1706.00527.pdf
     return x + np.random.normal(loc=0, scale=sigma, size=x.shape)
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def scaling(x, sigma=0.1):
     # https://arxiv.org/pdf/1706.00527.pdf
     factor = np.random.normal(loc=1, scale=sigma, size=(x.shape[0],x.shape[2]))
     return np.multiply(x, factor[:,np.newaxis,:])
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def time_warp(x, sigma=0.2, knot=4):
 
@@ -58,6 +64,8 @@ def time_warp(x, sigma=0.2, knot=4):
             scale = (x.shape[1]-1)/time_warp[-1]
             ret[i,:,dim] = np.interp(orig_steps, np.clip(scale*time_warp, 0, x.shape[1]-1), pat[:,dim]).T
     return ret
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def window_warp(x, window_ratio=0.1, scales=[0.5, 2.]):
     # https://halshs.archives-ouvertes.fr/halshs-01357973/document
@@ -196,16 +204,3 @@ def build_STS(
         STS_Y[r*s_length:(r+1)*s_length] = label
 
     return STS_X, STS_Y
-
-def discretize_TS(
-        TS: np.ndarray,
-        intervals: int, 
-        strategy: str = "quantile", # uniform (width) / quantile (freq) 
-        random_state: int = 0
-        ) -> np.ndarray:
-
-    kbd = KBinsDiscretizer(n_bins=intervals, encode="ordinal",
-            strategy=strategy, random_state=random_state)
-    kbd.fit(TS)
-    
-    return kbd.transform(TS), kbd
