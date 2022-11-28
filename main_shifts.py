@@ -5,8 +5,9 @@ alone and with shifted discrete label pretrains.
 @author Raúl Coterillo
 """
 
+from s3ts import plots
 from s3ts.network.architecture import model_wrapper, CNN_DTW
-from s3ts.tasks import data, train, plots
+from s3ts.tasks import data, train
 import s3ts
 
 from copy import deepcopy

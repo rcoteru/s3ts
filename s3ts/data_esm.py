@@ -1,10 +1,8 @@
-from scipy.spatial import distance_matrix
-from tqdm import tqdm
-import numpy as np
-
 from functools import partial
 import multiprocessing as mp
 import logging
+
+import numpy as np
 
 log = logging.Logger(__name__)
 

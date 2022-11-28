@@ -1,18 +1,34 @@
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+"""
+Multitask Learning Model
+
+@version 2022-12
+@author Raúl Coterillo
+"""
+
+# lightning
 from pytorch_lightning import LightningModule
 
+# base torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
 import torch.nn as nn
 import torchmetrics
 import torch
 
+# numpy
 import numpy as np
 
-from s3ts.network.parts import ConvEncoder, ConvDecoder, LinSeq
+from s3ts.network_aux import ConvEncoder, ConvDecoder, LinSeq
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+import logging
 
-class multitask_model(LightningModule):
+log = logging.Logger(__name__)
+
+# ========================================================= #
+#                     MULTITASK MODEL                       #
+# ========================================================= #
+
+class MultitaskModel(LightningModule):
 
     def __init__(self, 
         encoder: ConvEncoder,    

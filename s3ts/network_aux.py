@@ -1,9 +1,19 @@
+"""
+Parts for the model.
+
+@version 2022-12
+@author Raúl Coterillo
+"""
+
+# lightning
 from pytorch_lightning import LightningModule
 
 import torch.nn as nn
 import torch
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# ========================================================= #
+#                     NN BASIC MODULES                      #
+# ========================================================= #
 
 class LinSeq(LightningModule):
 
@@ -34,7 +44,7 @@ class LinSeq(LightningModule):
     def forward(self, x):
         return self.model(x)
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 class ConvEncoder(LightningModule): 
 
@@ -112,7 +122,7 @@ class ConvEncoder(LightningModule):
     def get_output_shape(self):
         return self.out_channels*2
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 class ConvDecoder(LightningModule): 
 
@@ -164,5 +174,3 @@ class ConvDecoder(LightningModule):
 
     def forward(self, x):
         return self.decoder(self.unflatten(self.linear(x)))
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

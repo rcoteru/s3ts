@@ -1,74 +1,90 @@
+"""
+Data acquisition and preprocessing for the neural network.
+
+@version 2022-12
+@author Raúl Coterillo
+"""
+
+# torch
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
 import torchvision as tv
 
-from s3ts.datasets.processing import shift_labels
+# numpy
+import numpy as np
 
+# standard library
+from __future__ import annotations
+from dataclasses import dataclass
 from collections import Counter
 import multiprocessing as mp
 from pathlib import Path
-import numpy as np
 import logging
 
+from s3ts import RANDOM_STATE
+rng = np.random.default_rng(seed=RANDOM_STATE)
 log = logging.Logger(__name__)
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+@dataclass
+class AuxTasksParams:
 
-class ESM(Dataset):
+    """ Settings for the auxiliary tasks. """
+
+    main_task_only: bool = False    # ¿Only do the main task?
+    
+    disc: bool = True               # Discretized clasification
+    disc_intervals: bool = 10       # Discretized intervals
+
+    pred: bool = True               # Prediction
+    pred_time: int = None           # Prediction time (if None, then window_size)
+    
+    aenc: bool = True               # Autoencoder
+
+# ========================================================= #
+#                    PYTORCH DATASETS                       #
+# ========================================================= #
+
+class ScalarLabelsDataset(Dataset):
 
     def __init__(self, 
-            OESM: np.ndarray, 
-            labels: np.ndarray, 
-            window_size: int = 5, 
-            windows_label: str = "mode", # "last", "mode"
+            file: Path,
+            window_size: int,
+            label_choice: str,     # "last" / "mode"
             transform = None, 
-            target_transform = None):
+            target_transform = None
+            ) -> None:
 
-        self.labels = labels
-        self.OESM = OESM
+        """ Reads files. """
 
+        self.file = file
         self.window_size = window_size
-        self.window_label = windows_label
-
+        self.label_choice = label_choice
         self.transform = transform
         self.target_transform = target_transform
 
-    @staticmethod
-    def load_data(path, mode: str):
-        
-        with np.load(path, 'r') as data:
-            if mode == "train":
-                labels = data['labels_train']
-                OESM = data['OESM_train']
-                STS = data['STS_train']
-            elif mode == "test":
-                labels = data['labels_train']
-                OESM = data['OESM_train']
-                STS = data['STS_train']
+        with np.load(file, 'r') as data: 
+            self.X_frames = data["frames"]
+            self.X_series = data["series"]
+            self.Y_values = data["values"]
 
-        return OESM, labels, STS
+        self.STS_length = len(self.Y_values)
+        self.n_samples = self.STS_length + 1 - self.window_size
 
-    def __len__(self):
+    def __len__(self) -> int:
 
         """ Return the number of samples in the dataset. """
-        
-        STS_length = len(self.labels)
-        n_samples_STS = STS_length + 1 - self.window_size
-
-        return n_samples_STS
+        return self.n_samples
 
     def __getitem__(self, idx: int) -> tuple[np.ndarray, int]:
 
-        """ Return an entry (data, label) from the dataset. """
+        """ Return an entry (x, y) from the dataset. """
 
-        STS_length = self.labels.shape[0]
-        n_samples_STS = STS_length + 1 - self.window_size
-
-        # sts_idx = idx // n_samples_per_STS
-        wdw_idx = idx % n_samples_STS
+        wdw_idx = idx % self.n_samples
 
         labels = self.labels[wdw_idx:wdw_idx + self.window_size]
         window = self.OESM[:, :, wdw_idx:wdw_idx + self.window_size]
+        
+        # adjust for torch-vision indexing
         window = np.moveaxis(window, 0, -1)
 
         if self.window_label == "last":     # pick the last label of the window
@@ -84,20 +100,27 @@ class ESM(Dataset):
         if self.target_transform:
             label = self.target_transform(label)
 
-        return window, label
+        return x, y
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# ========================================================= #
+#                  PYTORCH DATAMODULE                       #
+# ========================================================= #
 
-class ESM_DM(LightningDataModule):
+class STSDataModule(LightningDataModule):
 
     def __init__(self, 
-            target_file: Path, 
+            dataset_name: str, 
             window_size: int, 
+            aux_patterns: list[function],
+            tasks: AuxTasksParams,
             batch_size: int, 
-            label_shft: int = 0
+            patt_length: int = None,
+
             ) -> None:
         
         super().__init__()
+
+
         self.target_file = target_file
         self.batch_size = batch_size
         self.window_size = window_size
@@ -127,20 +150,20 @@ class ESM_DM(LightningDataModule):
         log.info("  Number of labels:", self.labels_size)
         log.info("Number of patterns:", self.channels)
 
-        log.info("Normalizing data...")
-        avg, std = np.average(OESM_train), np.std(OESM_train)
-        transform = tv.transforms.Compose([tv.transforms.ToTensor(), tv.transforms.Normalize((avg,), (std,))])
+        # log.info("Normalizing data...")
+        # avg, std = np.average(OESM_train), np.std(OESM_train)
+        # transform = tv.transforms.Compose([tv.transforms.ToTensor(), tv.transforms.Normalize((avg,), (std,))])
 
-        log.info("Creating train dataset...")
-        self.ds_train = ESM(OESM=OESM_train, labels=labels_train, window_size=self.window_size,transform=transform)
+        # log.info("Creating train dataset...")
+        # self.ds_train = ESM(OESM=OESM_train, labels=labels_train, window_size=self.window_size,transform=transform)
 
-        log.info("Creating val   dataset...")
-        self.ds_val = ESM(OESM=OESM_val, labels=labels_val, window_size=self.window_size, transform=transform)
+        # log.info("Creating val   dataset...")
+        # self.ds_val = ESM(OESM=OESM_val, labels=labels_val, window_size=self.window_size, transform=transform)
 
-        log.info("Creating test  dataset...")
-        self.ds_test = ESM(OESM=OESM_test, labels=labels_test, window_size=self.window_size, transform=transform)
+        # log.info("Creating test  dataset...")
+        # self.ds_test = ESM(OESM=OESM_test, labels=labels_test, window_size=self.window_size, transform=transform)
 
-        log.info(" ~ DATA MODULE PREPARED ~ ")        
+        # log.info(" ~ DATA MODULE PREPARED ~ ")  
 
     def train_dataloader(self):
         return DataLoader(self.ds_train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
@@ -153,5 +176,3 @@ class ESM_DM(LightningDataModule):
 
     def predict_dataloader(self):
         return DataLoader(self.ds_test, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
