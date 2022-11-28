@@ -4,7 +4,7 @@ Automation of the data manipulation tasks.
 
 # import library functions / objects
 from s3ts.datasets.processing import acquire_dataset, compute_medoids, build_STS, discretize_TS
-from s3ts.datasets.oesm import compute_OESM_parallel
+from s3ts.oesm import compute_OESM_parallel
 from s3ts.datasets.modules import ESM_DM
 
 # import constants
