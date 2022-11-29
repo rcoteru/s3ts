@@ -5,6 +5,21 @@ Data acquisition and preprocessing for the neural network.
 @author Raúl Coterillo
 """
 
+# package imports
+from s3ts.data_aux import acquire_dataset, build_STS, compute_medoids
+from s3ts.data_aux import AugProbabilities
+
+# external imports
+from torch.utils.data import Dataset, DataLoader
+from pytorch_lightning import LightningDataModule
+import torchvision as tv
+
+# numpy / scikit-learn
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import KBinsDiscretizer
+import matplotlib.pyplot as plt
+import numpy as np
+
 # standard library
 from __future__ import annotations
 from dataclasses import dataclass
@@ -13,21 +28,13 @@ import multiprocessing as mp
 from pathlib import Path
 import logging
 
-# external imports
-from torch.utils.data import Dataset, DataLoader
-from pytorch_lightning import LightningDataModule
-import torchvision as tv
-import numpy as np
-
-# package imports
-from s3ts.data_aux import acquire_dataset
-
-from s3ts import RANDOM_STATE
-rng = np.random.default_rng(seed=RANDOM_STATE)
 log = logging.Logger(__name__)
 
-data_folder = "data"
-image_folder = "images"
+data_folder: str    = "data"
+image_folder: str   = "images"
+
+dataset_fname: str = "dataset.npz"
+indexes_fname: str = "indexes.npz"
 
 @dataclass
 class AuxTasksParams:
@@ -48,37 +55,43 @@ class AuxTasksParams:
 #                    PYTORCH DATASETS                       #
 # ========================================================= #
 
-class ScalarLabelsDataset(Dataset):
+# TODO
+class MTaskDataset(Dataset):
 
-    def __init__(self, 
-            file: Path,
+    def __init__(self,
+            frames: np.ndarray,
+            series: np.ndarray,
+            olabels: np.ndarray,
+            dlabels: np.ndarray,
+            indexes: np.ndarray,
             window_size: int,
-            label_choice: str,     # "last" / "mode"
+            label_choice: str,      # "last" / "mode"
             transform = None, 
             target_transform = None
             ) -> None:
 
         """ Reads files. """
 
-        self.file = file
-        self.window_size = window_size
+        if label_choice not in ("last", "mode"):
+            raise NotImplementedError(f"Invalid label_choice '{label_choice}'.")
         self.label_choice = label_choice
+        
+        self.frames = frames
+        self.series = series
+        self.olabels = olabels
+        self.dlabels = dlabels
+        self.indexes = indexes
+
+        self.n_samples = len(self.indexes)
+
         self.transform = transform
         self.target_transform = target_transform
 
-        with np.load(file, 'r') as data: 
-            self.X_frames = data["frames"]
-            self.X_series = data["series"]
-            self.Y_values = data["values"]
-
-        self.STS_length = len(self.Y_values)
-        self.n_samples = self.STS_length + 1 - self.window_size
-
     def __len__(self) -> int:
-
         """ Return the number of samples in the dataset. """
         return self.n_samples
 
+    # TODO
     def __getitem__(self, idx: int) -> tuple[np.ndarray, int]:
 
         """ Return an entry (x, y) from the dataset. """
@@ -110,171 +123,178 @@ class ScalarLabelsDataset(Dataset):
 #                  PYTORCH DATAMODULE                       #
 # ========================================================= #
 
-class STSDataModule(LightningDataModule):
+class MTaskDataModule(LightningDataModule):
+
+    experiment: str     # name of the experiment folder
+    dataset: str        # name of the UCR/UEA dataset
+
+    sts_length: int     # 
+    window_size: int    # size of the 
+    batch_size: int     # 
+
+    num_workers: int    # number of workers for the DataLoaders
+    random_state: int   # 
+
+    tasks: AuxTasksParams           # 
+    aug_probs: AugProbabilities     # 
 
     def __init__(self, 
-            experiment_name: str,
-            dataset_name: str, 
+            experiment: str,
+            dataset: str, 
+            sts_length: int,
+            n_bins: int,
             window_size: int, 
-            aux_patterns: list[function],
             tasks: AuxTasksParams,
-            batch_size: int, 
-            patt_length: int = None,
+            # aux_patts: list[function], # TODO add
+            batch_size: int,
+            random_state: int = 0,
+            test_size: int = 0.3,
+            rho_memory: float = 0.1,
+            
+            label_choice: str = 'last',
+            distance_type: str = 'euclidean',
+            aug_probs: AugProbabilities = None,
+            num_workers: int = mp.cpu_count()//2,
+            # patt_length: int = None, # TODO check how pattern downsampling affects classification
             ) -> None:
         
         super().__init__()
 
+        # ~~~~~~~~~~~~~~ input checks ~~~~~~~~~~~~~~ 
+        
+        self.experiment = experiment   
+        self.dataset = dataset
+
+        if sts_length <= 5:
+            raise ValueError(f"Invalid window size '{window_size}'")
+        self.sts_length = sts_length 
+
+        if sts_length <= 5:
+            raise ValueError(f"Invalid window size '{window_size}'")
+        self.nbins = n_bins
+
+        if window_size <= 0:
+            raise ValueError(f"Invalid window size '{window_size}'")
+        self.window_size = int(window_size)
+
+        self.distance_type = distance_type
+
+        self.test_size = test_size
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.random_state = random_state 
+
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 
         # create output folder
-        save_path = Path.cwd() / data_folder / exp_name
-        log.info(f"Creating experiment '{exp_name}' in {save_path}")
-        save_path.mkdir(parents=True, exist_ok=exists_ok)
+        self.exp_path = Path.cwd() / data_folder / experiment
+        # log.info(f"Creating experiment '{exp_name}' in {save_path}")
+        self.exp_path.mkdir(parents=True, exist_ok=False)
 
-        # assign whatever variables
-        self.target_file = target_file
-        self.batch_size = batch_size
-        self.window_size = window_size
-        self.num_workers = mp.cpu_count()//2
+        # compute the dataset
+        self.__compute_dataset()
 
-        log.info(" ~ PREPARING DATA MODULE ~ ")
+        # generate 
+        self.__generate_indexes()
 
-        log.info("Loading data...")
-        OESM_train, labels_train,  STS_train = ESM.load_data(self.target_file, mode="train")
-        OESM_test, labels_test,  STS_test = ESM.load_data(self.target_file, mode="test")
-
-        # shift labels if needed
-        labels_train, OESM_train, STS_train = shift_labels(labels_train, OESM_train, STS_train, shift=label_shft)
-        labels_test, OESM_test, STS_test = shift_labels(labels_test, OESM_test, STS_test, shift=label_shft)
-
-        log.info("Splitting validation set from test data...")
-        STS_length = len(labels_test)
-        OESM_val , labels_val =  OESM_test[:,:,STS_length//2:], labels_test[STS_length//2:]
-        OESM_test, labels_test = OESM_test[:,:,:STS_length//2], labels_test[:STS_length//2]
-
-        self.labels_size = len(np.unique(labels_train)) # number of labels
-        self.channels = OESM_train.shape[0]             # number of patterns
-
-        log.info("       Train shape:", OESM_train.shape)
-        log.info("         Val shape:", OESM_val.shape)
-        log.info("        Test shape:", OESM_test.shape)
-        log.info("  Number of labels:", self.labels_size)
-        log.info("Number of patterns:", self.channels)
-
+        # normalization_transform
         # log.info("Normalizing data...")
-        # avg, std = np.average(OESM_train), np.std(OESM_train)
-        # transform = tv.transforms.Compose([tv.transforms.ToTensor(), tv.transforms.Normalize((avg,), (std,))])
+        avg, std = np.average(self.X_train), np.std(self.X_train)
+        transform = tv.transforms.Compose([tv.transforms.ToTensor(), 
+                          tv.transforms.Normalize((avg,), (std,))])
 
-        # log.info("Creating train dataset...")
-        # self.ds_train = ESM(OESM=OESM_train, labels=labels_train, window_size=self.window_size,transform=transform)
+        # log.info("Splitting validation set from test data...")2
+        test_indexes = np.arange(self.test_length//2)
+        eval_indexes = np.arange(self.test_length//2, self.test_length)
 
-        # log.info("Creating val   dataset...")
-        # self.ds_val = ESM(OESM=OESM_val, labels=labels_val, window_size=self.window_size, transform=transform)
+        self.ds_train = MTaskDataset(
+            frames=self.frames_train, series=self.series_train,
+            olabels=self.olabels_train, dlabels=self.dlabels_train,
+            indexes=self.indexes_train, window_size=self.window_size,
+            label_choice=self.label_choice, transform=transform)
 
-        # log.info("Creating test  dataset...")
-        # self.ds_test = ESM(OESM=OESM_test, labels=labels_test, window_size=self.window_size, transform=transform)
+        self.ds_eval = MTaskDataset(
+            frames=self.frames_train, series=self.series_train,
+            olabels=self.olabels_train, dlabels=self.dlabels_train,
+            indexes=self.indexes_train, window_size=self.window_size,
+            label_choice=self.label_choice, transform=transform)
 
-        # log.info(" ~ DATA MODULE PREPARED ~ ")  
+        self.ds_test = MTaskDataset(
+            frames=self.frames_train, series=self.series_train,
+            olabels=self.olabels_train, dlabels=self.dlabels_train,
+            indexes=self.indexes_train, window_size=self.window_size,
+            label_choice=self.label_choice, transform=transform)
 
-    def __download_dataset(self):
+        log.info("Patterns:", self.channels)
+        log.info("Labels:", self.labels_size)
+        log.info("Train samples:", len(self.ds_train))
+        log.info("Eval samples:",  len(self.ds_eval))
+        log.info("Test samples:",  len(self.ds_test))
 
-        # grab the data 
-        X, Y, mapping = acquire_dataset(dataset)
-        n_labels = len(np.unique(Y))
+    def __compute_dataset(self):
+
+        """ Download a dataset from the UCR / UEA archive. """
+
+        ## checks if new computation is needed
+
+        # grab the data from the internet
+        X, Y, mapping = acquire_dataset(self.dataset)
+        self.n_labels = int(len(np.unique(Y)))
 
         # train-test split
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_size, 
-                random_state=RANDOM_STATE, stratify=Y, shuffle=True)
+        self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(X, Y, 
+            test_size=self.test_size, random_state=self.random_state, stratify=Y, shuffle=True)
 
         # compute medoids 
-        medoids, medoid_ids = compute_medoids(X_train, Y_train, distance_type=medoid_type)
+        medoids, medoid_ids = compute_medoids(self.X_train, self.Y_train, distance_type=self.distance_type)
         
         # plot the medoids
-        img_folder = exp_path / "images" / "medoids"
-        img_folder.mkdir(parents=True, exist_ok=True)
-        for i in range(medoids.shape[0]):
-            plt.figure(figsize=(6,6))
-            plt.title(f"Medoid of class {i}")
-            plt.plot(medoids[i])
-            plt.savefig(img_folder / f"medoid{i}.png")
-            plt.close()
+        # img_folder = exp_path / "images" / "medoids"
+        # img_folder.mkdir(parents=True, exist_ok=True)
+        # for i in range(medoids.shape[0]):
+        #     plt.figure(figsize=(6,6))
+        #     plt.title(f"Medoid of class {i}")
+        #     plt.plot(medoids[i])
+        #     plt.savefig(img_folder / f"medoid{i}.png")
+        #     plt.close()
+
+        # create train STS from samples
+        self.series_train, self.olabels_train = build_STS(X=self.X_train, Y=self.Y_train, 
+            sts_length=self.sts_length, aug_probs=self.aug_probs) #, skip_ids=medoid_ids)
+        self.train_length = len(self.olabels_train)
+
+        # create test STS from samples TODO hacer que no sea aleatorio, longitud tamaño test
+        self.series_test, self.olabels_test = build_STS(X=self.X_test, Y=self.Y_test, 
+            sts_length=self.sts_length, aug_probs=None)
+        self.test_length = len(self.olabels_test)
+
+        # calculate discrete labels
+        self.__calculate_discrete_labels(n_bins=self.n_bins)
+
+        # compute the OESM
+        self.frames_train = compute_OESM_parallel(STS_train, patterns=medoids, rho=rho_memory)
+        self.frames_test = compute_OESM_parallel(STS_test, patterns=medoids, rho=rho_memory)
 
         # save everything to a file
-        np.savez_compressed(base_file, 
+        np.savez_compressed(self.dataset_fname:
             X_train=X_train, Y_train=Y_train,
             X_test=X_test, Y_test=Y_test,
             medoids=medoids, medoid_ids=medoid_ids,
             mapping=mapping, test_size=test_size, 
             n_labels=n_labels)
 
-    def __generate_shared_data(
-            exp_path: Path,
-            task_name: str,
-            sts_length: int,
-            label_type: str,
-            label_shft: int,
-            rho_memory: float = 0.1,
-            batch_size: int = 128,
-            wndow_size: int = 5,
-            force: bool = False
-            ) -> None:
-
-        log.info(f"Generating classification data for task '{task_name}' in '{exp_path.name}' ...")
-        target_file = exp_path / f"{task_name}_{base_task_fname}"
-
-        # load datamodule if calculation is not needed
-        if not (force or not target_file.exists()):
-            return ESM_DM(target_file, window_size=wndow_size, batch_size=batch_size, label_shft=label_shft)
-
-        # load experiment data
-        base_file = exp_path / base_main_fname
-        with np.load(base_file) as data:
-            medoids, medoid_ids = data["medoids"], data["medoid_ids"]
-            X_train, Y_train = data["X_train"], data["Y_train"]
-            X_test,  Y_test  = data["X_test"], data["Y_test"]
-            n_labels = data["n_labels"]
-
-        # calculate labels
-        if label_type == "original":
-            Y_train = Y_train
-            Y_test = Y_test
-        elif label_type == "discrete_STS":
-            Y_train, kbd = discretize_TS(X_train, intervals=int(n_labels), strategy="quantile")
-            
-            # kbd = KBinsDiscretizer(n_bins=intervals, encode="ordinal",
-            # strategy=strategy, random_state=random_state)
-            # kbd.fit(TS)
-            
-            # return kbd.transform(TS)
-
-            Y_test = kbd.transform(X_test)
-        else:
-            raise NotImplementedError(f"Unknown label type: '{label_type}'")
-
-        # create train STS from samples
-        STS_train, labels_train = build_STS(X=X_train, Y=Y_train, 
-            sts_length=sts_length, skip_ids=medoid_ids,
-            aug_jitter = 0, aug_time_warp = 0, 
-            aug_scaling = 0, aug_window_warp = 0) 
-        
-        # create test STS from samples
-        # TODO hacer que no sea aleatorio, longitud tamaño test
-        STS_test, labels_test = build_STS(X=X_train, Y=Y_train, 
-            sts_length=sts_length)   
-
-        # compute the OESM
-        OESM_train = compute_OESM_parallel(STS_train, patterns = medoids, rho=rho_memory)
-        OESM_test = compute_OESM_parallel(STS_test, patterns = medoids, rho=rho_memory)
-
         # save the data
         np.savez_compressed(target_file, 
             STS_train = STS_train, STS_test = STS_test,
             labels_train = labels_train, labels_test = labels_test,
             OESM_train = OESM_train, OESM_test = OESM_test)
-
-    def __generate_discrete_labels():
-
-
-        pass
+        
+    def __calculate_discrete_labels(self, n_bins: int) -> None:
+        self.kbd = KBinsDiscretizer(n_bins=n_bins, encode="ordinal",
+                    strategy="quantile", random_state=self.random_state)
+        self.kbd.fit(self.series_train)
+        self.dlabels_train = self.kbd.transform(self.series_train)
+        self.dlabels_test = self.kbd.transform(self.series_test)
 
     def train_dataloader(self):
         return DataLoader(self.ds_train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
