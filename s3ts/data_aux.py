@@ -17,7 +17,8 @@ from scipy.spatial import distance_matrix
 from scipy.interpolate import CubicSpline
 import numpy as np
 
-from dataclasses import dataclass
+
+from s3ts.data_str import AugProbabilities
 import logging
 
 log = logging.Logger(__name__)
@@ -26,16 +27,6 @@ log = logging.Logger(__name__)
 # ========================================================= #
 #                      AUGMENTATIONS                        #
 # ========================================================= #
-
-@dataclass
-class AugProbabilites:
-    """ Data augmentation probabilites. """
-    jitter:      float = 0
-    scaling:     float = 0
-    time_warp:   float = 0
-    window_warp: float = 0
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def jitter(x, sigma=0.03):
     # https://arxiv.org/pdf/1706.00527.pdf
@@ -165,7 +156,8 @@ def build_STS(
         Y: np.ndarray, 
         sts_length: int,
         skip_ids: list[int] = [],
-        aug_probs: AugProbabilites = None,
+        aug_probs: AugProbabilities = None,
+        random_state: int = 0,
         ) -> tuple[np.ndarray, np.ndarray]:
 
     assert(X.shape[0] == Y.shape[0])
@@ -176,6 +168,8 @@ def build_STS(
 
     STS_X = np.empty(sts_length*s_length)
     STS_Y = np.empty(sts_length*s_length)
+
+    rng = np.random.default_rng(seed=random_state)
 
     for r in range(sts_length):
 

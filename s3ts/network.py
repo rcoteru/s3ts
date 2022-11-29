@@ -19,6 +19,7 @@ import torch
 import numpy as np
 
 from s3ts.network_aux import ConvEncoder, ConvDecoder, LinSeq
+from s3ts.data_str import TaskParameters
 
 import logging
 
@@ -30,41 +31,67 @@ log = logging.Logger(__name__)
 
 class MultitaskModel(LightningModule):
 
-    def __init__(self, 
-        encoder: ConvEncoder,    
-        patt_size: int, 
+    def __init__(self,      
+        n_labels: int,
         n_patterns: int, 
-        ds_labels: int,
-        tasks: list[str, tuple],
-        main_task_only: bool = True):
+        patt_length: int,
+        window_size: int,
+        tasks: TaskParameters,
+        max_feature_maps: int = 128
+        ):
 
         super().__init__()
 
-        self.patt_size = patt_size
+        self.n_labels = n_labels
         self.n_patterns = n_patterns
-        self.main_task_only = main_task_only
+        self.patt_length = patt_length
+        self.window_size = window_size
+        
         self.tasks = tasks
 
-        self.encoder = encoder
-        self.decoder = nn.Linear(in_features=self.encoder.get_output_shape(), 
-                out_features=ds_labels)
+        # main encoder
+        self.conv_encoder = ConvEncoder(
+            in_channels=n_patterns,
+            out_channels=max_feature_maps,
+            conv_kernel_size=3,
+            pool_kernel_size=3,
+            img_height=patt_length,
+            img_width=window_size
+        )
 
-        self.aux_decoders = []
-        for t in tasks:
-            if t[1] == "cls":
-                meta = t[2]
-                tasks.append(nn.Linear(in_features=self.encoder.get_output_shape(), 
-                    out_features=meta[1]))
-            if t[1] == "ae":
-                tasks.append(ConvDecoder(
-                    in_channels=encoder.out_channels,
-                    out_channels=encoder.in_channels,
-                    conv_kernel_size=encoder.conv_kernel_size,
-                    img_height=encoder.img_height,
-                    img_width=encoder.img_width,
-                    encoder_feats=encoder.get_encoder_features()))
-            else:
-                raise NotImplementedError
+        encoder_out_feats = self.encoder.get_output_shape()
+
+        # main classification
+        self.main_decoder = nn.Sequential(
+            LinSeq(in_features=encoder_out_feats,
+            hid_features=encoder_out_feats*2,
+            out_features=self.n_labels,
+            hid_layers=0),
+            nn.Softmax(dim=self.n_labels))
+
+        # discretized classification
+        self.disc_decoder = nn.Sequential(
+            LinSeq(in_features=encoder_out_feats,
+            hid_features=encoder_out_feats*2,
+            out_features=tasks.discrete_intervals,
+            hid_layers=0),
+            nn.Softmax(dim=tasks.discrete_intervals))
+
+        # discretized prediction decoder
+        self.disc_decoder = nn.Sequential(
+            LinSeq(in_features=encoder_out_feats,
+            hid_features=encoder_out_feats*2,
+            out_features=tasks.discrete_intervals,
+            hid_layers=0),
+            nn.Softmax(dim=tasks.discrete_intervals))
+            
+        # autoencoder
+        self.conv_decoder = ConvDecoder(
+            in_channels=max_feature_maps,
+            out_channels=n_patterns,
+            conv_kernel_size=3,
+            img_height=patt_length,
+            img_width=window_size)
 
         self.train_acc = torchmetrics.Accuracy()
         self.train_f1 = torchmetrics.F1Score(num_classes=n_patterns, average="micro")
@@ -100,6 +127,13 @@ class MultitaskModel(LightningModule):
 
     # STEPS
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+    def predict_step(self, batch, batch_idx):
+
+        """ Just calls forward, can be used to predict. """
+
+        # this calls forward
+        return self(batch)
 
     # TODO
     def _inner_step(self, x, y):

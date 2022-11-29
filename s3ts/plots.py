@@ -24,6 +24,16 @@ plt.rcParams['ytick.labelsize'] = 0.5 * plt.rcParams['font.size']
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
+# plot the medoids
+# img_folder = exp_path / "images" / "medoids"
+# img_folder.mkdir(parents=True, exist_ok=True)
+# for i in range(medoids.shape[0]):
+#     plt.figure(figsize=(6,6))
+#     plt.title(f"Medoid of class {i}")
+#     plt.plot(medoids[i])
+#     plt.savefig(img_folder / f"medoid{i}.png")
+#     plt.close()
+
 def plot_medoids(
         exp_path: Path,
         show: bool = False
