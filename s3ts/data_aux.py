@@ -10,7 +10,7 @@ from sktime.clustering.k_medoids import TimeSeriesKMedoids
 from sktime.datasets import load_UCR_UEA_dataset
 
 # scikit-learn
-from sklearn.preprocessing import KBinsDiscretizer
+
 
 # numpy / scipy
 from scipy.spatial import distance_matrix
