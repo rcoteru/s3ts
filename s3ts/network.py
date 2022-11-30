@@ -37,7 +37,8 @@ class MultitaskModel(LightningModule):
         patt_length: int,
         window_size: int,
         tasks: TaskParameters,
-        max_feature_maps: int = 128
+        max_feature_maps: int = 128,
+        learning_rate: float = 1e-5
         ):
 
         super().__init__()
@@ -49,6 +50,8 @@ class MultitaskModel(LightningModule):
         
         self.tasks = tasks
 
+        self.learning_rate = learning_rate
+
         # main encoder
         self.conv_encoder = ConvEncoder(
             in_channels=n_patterns,
@@ -59,7 +62,7 @@ class MultitaskModel(LightningModule):
             img_width=window_size
         )
 
-        encoder_out_feats = self.encoder.get_output_shape()
+        encoder_out_feats = self.conv_encoder.get_output_shape()
 
         # main classification
         self.main_decoder = nn.Sequential(
@@ -78,7 +81,7 @@ class MultitaskModel(LightningModule):
             nn.Softmax(dim=tasks.discrete_intervals))
 
         # discretized prediction decoder
-        self.disc_decoder = nn.Sequential(
+        self.pred_decoder = nn.Sequential(
             LinSeq(in_features=encoder_out_feats,
             hid_features=encoder_out_feats*2,
             out_features=tasks.discrete_intervals,
@@ -91,7 +94,8 @@ class MultitaskModel(LightningModule):
             out_channels=n_patterns,
             conv_kernel_size=3,
             img_height=patt_length,
-            img_width=window_size)
+            img_width=window_size,
+            encoder_feats=encoder_out_feats)
 
         self.train_acc = torchmetrics.Accuracy()
         self.train_f1 = torchmetrics.F1Score(num_classes=n_patterns, average="micro")
@@ -113,17 +117,15 @@ class MultitaskModel(LightningModule):
 
         """ Use for inference only (separate from training_step)"""
 
-        shared = self.encoder(x)
-        output = self.decoder(shared) 
+        shared = self.conv_encoder(x)
 
-        if self.main_task_only:
-            return output
+        # auxiliary tasks
+        main_out = self.main_decoder(shared)
+        disc_out = self.disc_decoder(shared)
+        pred_out = self.pred_decoder(shared)
+        aenc_out = self.conv_decoder(shared)
 
-        aux_outputs = []
-        for i in range(len(self.tasks)):
-            aux_outputs.append(self.decoders[i](shared))
-
-        return output, aux_outputs
+        return main_out, disc_out, pred_out, aenc_out
 
     # STEPS
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -138,18 +140,23 @@ class MultitaskModel(LightningModule):
     # TODO
     def _inner_step(self, x, y):
         
-        logits, decoded = self(x)
-        
-        y_pred = logits.softmax(dim=-1)
+        main_out, disc_out, pred_out, aenc_out  = self(x)
+        olabel, dlabel, dlabel_pred = y
 
-        y_true = F.one_hot(y, num_classes=self.labels)
-        y_true = y_true.type(torch.DoubleTensor)
-        
-        main_loss = F.cross_entropy(logits, )
-        
-        return loss, y_pred
+        y_true_main = F.one_hot(olabel, num_classes=self.n_labels).type(torch.DoubleTensor)
+        y_true_disc = F.one_hot(dlabel, num_classes=self.n_labels).type(torch.DoubleTensor)
+        y_true_pred = F.one_hot(dlabel_pred, num_classes=self.n_labels).type(torch.DoubleTensor)
 
-    # TODO
+        main_loss = F.cross_entropy(main_out, y_true_main)
+        disc_loss = F.cross_entropy(disc_out, y_true_disc)
+        pred_loss = F.cross_entropy(pred_out, y_true_pred)
+        aenc_loss = F.mse_loss(aenc_out, x)
+
+        total_loss = np.average([main_loss, disc_loss, pred_loss, aenc_loss],
+            weights=[5,1,1,1])
+
+        return total_loss, main_out
+
     def training_step(self, batch, batch_idx):
 
         """ Complete training loop. """
@@ -262,7 +269,7 @@ class MultitaskModel(LightningModule):
 
         """ Define optimizers and LR schedulers. """
 
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {

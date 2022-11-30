@@ -108,8 +108,7 @@ class ConvEncoder(LightningModule):
         self.linear = LinSeq(
             in_features=encoder_feats,
             hid_features=out_channels,
-            out_features=out_channels*2
-        )
+            out_features=out_channels*2)
 
     def forward(self, x):
         return self.linear(self.flatten(self.encoder(x)))

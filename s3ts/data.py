@@ -8,7 +8,7 @@ Data acquisition and preprocessing for the neural network.
 from __future__ import annotations
 
 # package imports
-from s3ts.data_aux import AugProbabilities
+from s3ts.data_str import AugProbabilities, TaskParameters
 from s3ts.data_aux import download_dataset, build_STS, compute_medoids
 from s3ts.data_esm import compute_OESM_parallel
 
@@ -24,7 +24,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # standard library
-from dataclasses import dataclass
 import multiprocessing as mp
 from pathlib import Path
 import logging
@@ -45,7 +44,7 @@ indexes_fname: str = "indexes.npz"
 class MTaskDataset(Dataset):
 
     def __init__(self,
-            tasks: AuxTasksParams,
+            tasks: TaskParameters,
             frames: np.ndarray,
             series: np.ndarray,
             olabels: np.ndarray,
@@ -115,7 +114,7 @@ class MTaskDataModule(LightningDataModule):
     num_workers: int    # number of workers for the DataLoaders
     random_state: int   # 
 
-    tasks: AuxTasksParams           # 
+    tasks: TaskParameters           # 
     aug_probs: AugProbabilities     # 
 
     def __init__(self, 
@@ -123,7 +122,7 @@ class MTaskDataModule(LightningDataModule):
             dataset: str, 
             sts_length: int,
             window_size: int, 
-            tasks: AuxTasksParams,
+            tasks: TaskParameters,
             # aux_patts: list[function], # TODO add
             batch_size: int,
             random_state: int = 0,
