@@ -33,7 +33,12 @@ RANDOM_STATE = 0
 seed_everything(RANDOM_STATE)
 
 probs = AugProbabilities()
-tasks = TaskParameters()
+tasks = TaskParameters(
+    disc=True,
+    pred=True,
+)
+
+
 
 print("Computing dataset...")
 start_time = time.perf_counter()
@@ -68,7 +73,7 @@ lr_monitor = LearningRateMonitor(logging_interval='step')
 model_checkpoint = ModelCheckpoint(dm.exp_path, save_last=True)
 trainer = Trainer(default_root_dir=dm.exp_path,
     callbacks=[lr_monitor, model_checkpoint],
-    max_epochs=1, check_val_every_n_epoch=1,
+    max_epochs=100, check_val_every_n_epoch=1,
     deterministic = True)
 end_time = time.perf_counter()
 print(end_time - start_time, "seconds")

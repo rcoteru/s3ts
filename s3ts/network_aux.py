@@ -97,21 +97,26 @@ class ConvEncoder(LightningModule):
                 kernel_size=conv_kernel_size, padding='same'),
             nn.BatchNorm2d(num_features=out_channels),
             nn.ReLU())
+        self.encoder = self.encoder.float()
 
         # get flattened dimensions after encoder
         image_dim = (1, in_channels, img_height, img_width)
         features = self.encoder(torch.rand(image_dim).float())
-        encoder_feats = features.view(features.size(0), -1).size(1)
+        self.encoder_feats = features.view(features.size(0), -1).size(1)
+        self.encoder_img_height = features.shape[2]
+        self.encoder_img_width = features.shape[3]
 
         self.flatten = nn.Flatten(start_dim=1)
 
         self.linear = LinSeq(
-            in_features=encoder_feats,
+            in_features=self.encoder_feats,
             hid_features=out_channels,
             out_features=out_channels*2)
 
     def forward(self, x):
-        return self.linear(self.flatten(self.encoder(x)))
+        enc_out = self.encoder(x.float())
+        flt_out = self.flatten(enc_out)
+        return self.linear(flt_out)
 
     def get_encoder_features(self):
         image_dim = (1, self.in_channels, self.img_height, self.img_width)
@@ -153,23 +158,30 @@ class ConvDecoder(LightningModule):
         self.decoder = nn.Sequential(
         
             nn.ConvTranspose2d(in_channels=in_channels, out_channels=in_channels//2, 
-                kernel_size=conv_kernel_size),
+                kernel_size=conv_kernel_size, padding=(conv_kernel_size-1)//2),
             nn.BatchNorm2d(in_channels//2),
             nn.ReLU(),
 
             nn.ConvTranspose2d(in_channels=in_channels//2, out_channels=in_channels//4, 
-                kernel_size=conv_kernel_size),
+                kernel_size=conv_kernel_size, padding=(conv_kernel_size-1)//2),
             nn.BatchNorm2d(in_channels//4),
             nn.ReLU(),
 
             nn.ConvTranspose2d(in_channels=in_channels//4, out_channels=in_channels//8, 
-                kernel_size=conv_kernel_size),
+                kernel_size=conv_kernel_size, padding=(conv_kernel_size-1)//2),
             nn.BatchNorm2d(in_channels//8),
             nn.ReLU(),
 
-            nn.ConvTranspose2d(in_channels=in_channels//8, out_channels=out_channels//8, 
-                kernel_size=conv_kernel_size)
+            #nn.Upsample(scale_factor=2, mode="bilinear")
+            #nn.MaxUnPool2d(kernel_size=pool_kernel_size),
+
+            nn.ConvTranspose2d(in_channels=in_channels//8, out_channels=out_channels, 
+                kernel_size=conv_kernel_size, padding=(conv_kernel_size-1)//2)
         )
 
     def forward(self, x):
-        return self.decoder(self.unflatten(self.linear(x)))
+        lin_out = self.linear(x.float())
+        flt_out = self.unflatten(lin_out)
+        return self.decoder(flt_out)
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

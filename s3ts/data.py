@@ -82,7 +82,7 @@ class MTaskDataset(Dataset):
         olabel = self.olabels[idx]
         dlabel = self.dlabels[idx]
         dlabel_pred = self.dlabels[idx + self.window_size]
-        window = self.frames[:,:, idx-self.window_size:idx]
+        window = self.frames[:,:,idx - self.window_size:idx]
         
         # TODO not sure if needed anymore
         # adjust for torch-vision indexing
@@ -93,10 +93,7 @@ class MTaskDataset(Dataset):
         if self.target_transform:
             label = self.target_transform(label)
 
-        if self.tasks.main_task_only:
-            return window, olabel
-        else:
-            return window, (olabel, dlabel, dlabel_pred)
+        return window, (olabel, dlabel, dlabel_pred)
 
 # ========================================================= #
 #                    PYTORCH DATAMODULE                     #
@@ -261,12 +258,14 @@ class MTaskDataModule(LightningDataModule):
             sts_length=self.extra_samples+self.sts_length, random_state=self.random_state,
             aug_probs=self.aug_probs) #, skip_ids=medoid_ids)
         self.train_length = len(self.olabels_train)
+        self.olabels_train = self.olabels_train.astype(int)
 
         # create test STS from samples TODO hacer que no sea aleatorio, longitud tamaño test
         self.series_test, self.olabels_test = build_STS(X=self.X_test, Y=self.Y_test, 
             sts_length=self.extra_samples+self.sts_length, random_state=self.random_state,
             aug_probs=None)
         self.test_length = len(self.olabels_test)
+        self.olabels_test = self.olabels_test.astype(int)
 
         # compute the OESM
         self.frames_train = compute_OESM_parallel(self.series_train, patterns=self.medoids, rho=self.rho_memory)
@@ -293,7 +292,11 @@ class MTaskDataModule(LightningDataModule):
                     strategy="quantile", random_state=self.random_state)
         self.kbd.fit(self.series_train.reshape(-1,1))
         self.dlabels_train = self.kbd.transform(self.series_train.reshape(-1,1))
+        self.dlabels_train = self.dlabels_train.squeeze().astype(int)
+        #self.dlabels_train = self.dlabels_train
         self.dlabels_test = self.kbd.transform(self.series_test.reshape(-1,1))
+        self.dlabels_test = self.dlabels_test.squeeze().astype(int)
+        #self.dlabels_test = self.dlabels_test
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
         
@@ -303,12 +306,20 @@ class MTaskDataModule(LightningDataModule):
 
         start_buff = self.sample_length*self.extra_samples
         
-        train_length = self.train_length - start_buff
-        test_length = self.test_length - start_buff
+        # if self.tasks.pred:
+        end_buff = self.window_size if self.tasks.pred_time is None else self.tasks.pred_time 
+        train_end = self.train_length - end_buff
+        test_end = self.test_length - end_buff
+        # else:
+        #     train_end = self.train_length
+        #     test_end = self.test_length
+
+        train_length = train_end - start_buff
+        test_length = test_end - start_buff
 
         self.indexes_test = np.arange(start_buff, start_buff + test_length//2)
-        self.indexes_eval = np.arange(start_buff + test_length//2, self.test_length)
-        self.indexes_train = np.arange(start_buff, self.train_length)
+        self.indexes_eval = np.arange(start_buff + test_length//2, test_end)
+        self.indexes_train = np.arange(start_buff, train_end)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 

@@ -4,11 +4,9 @@ from dataclasses import dataclass
 class TaskParameters:
 
     """ Settings for the auxiliary tasks. """
-
-    main_task_only: bool = False    # ¿Only do the main task?
     
     disc: bool = True               # Discretized clasification
-    discrete_intervals: int = 10    # Discretized intervals
+    discrete_intervals: int = 5     # Discretized intervals
 
     pred: bool = True               # Prediction
     pred_time: int = None           # Prediction time (if None, then window_size)

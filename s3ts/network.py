@@ -69,33 +69,30 @@ class MultitaskModel(LightningModule):
             LinSeq(in_features=encoder_out_feats,
             hid_features=encoder_out_feats*2,
             out_features=self.n_labels,
-            hid_layers=0),
-            nn.Softmax(dim=self.n_labels))
+            hid_layers=0), nn.Softmax())
 
         # discretized classification
         self.disc_decoder = nn.Sequential(
             LinSeq(in_features=encoder_out_feats,
             hid_features=encoder_out_feats*2,
             out_features=tasks.discrete_intervals,
-            hid_layers=0),
-            nn.Softmax(dim=tasks.discrete_intervals))
+            hid_layers=0), nn.Softmax())
 
         # discretized prediction decoder
         self.pred_decoder = nn.Sequential(
             LinSeq(in_features=encoder_out_feats,
             hid_features=encoder_out_feats*2,
             out_features=tasks.discrete_intervals,
-            hid_layers=0),
-            nn.Softmax(dim=tasks.discrete_intervals))
+            hid_layers=0), nn.Softmax())
             
         # autoencoder
-        self.conv_decoder = ConvDecoder(
-            in_channels=max_feature_maps,
-            out_channels=n_patterns,
-            conv_kernel_size=3,
-            img_height=patt_length,
-            img_width=window_size,
-            encoder_feats=encoder_out_feats)
+        # self.conv_decoder = ConvDecoder(
+        #     in_channels=max_feature_maps,
+        #     out_channels=n_patterns,
+        #     conv_kernel_size=3,
+        #     img_height=self.conv_encoder.encoder_img_height,
+        #     img_width=self.conv_encoder.encoder_img_width,
+        #     encoder_feats=self.conv_encoder.encoder_feats)
 
         self.train_acc = torchmetrics.Accuracy()
         self.train_f1 = torchmetrics.F1Score(num_classes=n_patterns, average="micro")
@@ -110,22 +107,34 @@ class MultitaskModel(LightningModule):
         self.test_auroc = torchmetrics.AUROC(num_classes=n_patterns, average="macro")
 
     # TODO
-    def get_output_shape(self):
-        return None
+    # def get_output_shape(self):
+    #     return None
 
     def forward(self, x):
 
         """ Use for inference only (separate from training_step)"""
 
         shared = self.conv_encoder(x)
+        results = []
+
+
+        # main task
+        main_out = self.main_decoder(shared)
+        results.append(main_out)
 
         # auxiliary tasks
-        main_out = self.main_decoder(shared)
-        disc_out = self.disc_decoder(shared)
-        pred_out = self.pred_decoder(shared)
-        aenc_out = self.conv_decoder(shared)
+        if self.tasks.disc:
+            disc_out = self.disc_decoder(shared)
+            results.append(disc_out)
+        if self.tasks.pred:
+            pred_out = self.pred_decoder(shared)
+            results.append(pred_out)
+        if self.tasks.aenc:
+            # aenc_out = self.conv_decoder(shared)
+            # results.append(aenc_out)
+            pass
 
-        return main_out, disc_out, pred_out, aenc_out
+        return results
 
     # STEPS
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -140,20 +149,41 @@ class MultitaskModel(LightningModule):
     # TODO
     def _inner_step(self, x, y):
         
-        main_out, disc_out, pred_out, aenc_out  = self(x)
+        results = self(x)
         olabel, dlabel, dlabel_pred = y
 
-        y_true_main = F.one_hot(olabel, num_classes=self.n_labels).type(torch.DoubleTensor)
-        y_true_disc = F.one_hot(dlabel, num_classes=self.n_labels).type(torch.DoubleTensor)
-        y_true_pred = F.one_hot(dlabel_pred, num_classes=self.n_labels).type(torch.DoubleTensor)
-
+        counter = 0
+        losses = []
+        weights = []
+        
+        main_out = results[0]
+        y_true_main = F.one_hot(olabel, num_classes=self.n_labels).float()
         main_loss = F.cross_entropy(main_out, y_true_main)
-        disc_loss = F.cross_entropy(disc_out, y_true_disc)
-        pred_loss = F.cross_entropy(pred_out, y_true_pred)
-        aenc_loss = F.mse_loss(aenc_out, x)
+        losses.append(main_loss)
+        weights.append(3)
+        counter += 1
 
-        total_loss = np.average([main_loss, disc_loss, pred_loss, aenc_loss],
-            weights=[5,1,1,1])
+        if self.tasks.disc:
+            disc_out = results[counter]
+            y_true_disc = F.one_hot(dlabel, num_classes=self.tasks.discrete_intervals).float()
+            disc_loss = F.cross_entropy(disc_out, y_true_disc)
+            losses.append(disc_loss)
+            weights.append(1)
+            counter += 1
+
+        if self.tasks.pred:
+            pred_out = results[counter]
+            y_true_pred = F.one_hot(dlabel_pred, num_classes=self.tasks.discrete_intervals).float()
+            pred_loss = F.cross_entropy(pred_out, y_true_pred)
+            losses.append(pred_loss)
+            weights.append(1)
+            counter += 1
+
+        #aenc_loss = F.mse_loss(aenc_out, x)
+
+        W = torch.tensor(weights, dtype=torch.float32)
+        A = torch.stack(losses)
+        total_loss = W@A/W.sum()
 
         return total_loss, main_out
 
@@ -167,14 +197,14 @@ class MultitaskModel(LightningModule):
         loss, y_pred = self._inner_step(x, y)
 
         # accumulate and return metrics for logging
-        acc = self.train_acc(y_pred, y)
-        f1 = self.train_f1(y_pred, y)
+        acc = self.train_acc(y_pred, y[0])
+        f1 = self.train_f1(y_pred, y[0])
 
         self.log("train_loss", loss, sync_dist=True)
         self.log("train_accuracy", acc, prog_bar=True, sync_dist=True)
         self.log("train_f1", f1, prog_bar=True, sync_dist=True)
 
-        return loss
+        return loss.to(torch.float32)
     
     def _custom_stats_step(self, batch, stage=None):
         
@@ -184,14 +214,14 @@ class MultitaskModel(LightningModule):
         loss, y_pred = self._inner_step(x, y)
 
         if stage == 'val':
-            self.val_acc(y_pred, y)
-            self.val_f1(y_pred, y)
-            self.val_auroc(y_pred, y)
+            self.val_acc(y_pred, y[0])
+            self.val_f1(y_pred, y[0])
+            self.val_auroc(y_pred, y[0])
 
         elif stage == "test":
-            self.test_acc(y_pred, y)
-            self.test_f1(y_pred, y)
-            self.test_auroc(y_pred, y)
+            self.test_acc(y_pred, y[0])
+            self.test_f1(y_pred, y[0])
+            self.test_auroc(y_pred, y[0])
 
         return loss
     
