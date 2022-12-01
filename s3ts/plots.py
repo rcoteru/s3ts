@@ -3,7 +3,7 @@ import seaborn as sns
 
 import numpy as np
 
-from s3ts.tasks import data_folder, base_main_fname, base_task_fname, image_folder
+from s3ts.old_tasks import data_folder, base_main_fname, base_task_fname, image_folder
 
 
 from pathlib import Path
