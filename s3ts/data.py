@@ -1,8 +1,8 @@
 """
 Data acquisition and preprocessing for the neural network.
 
-@version 2022-12
 @author Raúl Coterillo
+@version 2022-12
 """
 
 from __future__ import annotations

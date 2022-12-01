@@ -1,8 +1,8 @@
 """
-Multitask Learning Model
+Multitask Convolutional Classification Model
 
-@version 2022-12
 @author Raúl Coterillo
+@version 2022-12
 """
 
 # lightning

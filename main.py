@@ -3,13 +3,12 @@ Run the main classification task alongside in two scenarios:
 alone and with shifted discrete label pretrains.
 
 @author Raúl Coterillo
+@version 2022-12
 """
 
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning import Trainer, seed_everything
-
-#from pytorch_lightning import 
 
 from s3ts.data_str import AugProbabilities, TaskParameters
 from s3ts.network import MultitaskModel
@@ -19,11 +18,10 @@ import time
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-EXPERIMENT = "prueba_CBF"
-DATASET = "CBF"
+EXPERIMENT = "test"
+DATASET = "GunPoint"
 
 TEST_SIZE = 0.3
-
 STS_LENGTH = 40
 
 WINDOW_SIZE = 10
@@ -35,15 +33,21 @@ seed_everything(RANDOM_STATE)
 
 probs = AugProbabilities()
 tasks = TaskParameters(
+    main_weight=3,
     disc=True,
+    disc_weight=1,
+    discrete_intervals=5,
     pred=True,
+    pred_time=None,
+    pred_weight=1,
+    aenc=False
 )
 
 print("Computing dataset...")
 start_time = time.perf_counter()
 dm = MTaskDataModule(
-    experiment="test",
-    dataset="GunPoint",
+    experiment=EXPERIMENT,
+    dataset=DATASET,
     sts_length=STS_LENGTH,
     window_size=WINDOW_SIZE,
     tasks=tasks,
@@ -52,6 +56,7 @@ dm = MTaskDataModule(
     random_state=RANDOM_STATE)
 end_time = time.perf_counter()
 print("DONE! ", end_time - start_time, "seconds")
+
 
 print("Creating model...", end="")
 start_time = time.perf_counter()
@@ -66,6 +71,7 @@ model = MultitaskModel(
 end_time = time.perf_counter()
 print(end_time - start_time, "seconds")
 
+
 print("Setup the trainer...")
 start_time = time.perf_counter()
 early_stop = EarlyStopping(monitor="val_auroc", mode="min", patience=5)
@@ -77,6 +83,7 @@ trainer = Trainer(default_root_dir=dm.exp_path,
     deterministic = True)
 end_time = time.perf_counter()
 print(end_time - start_time, "seconds")
+
 
 print("Begin training...")
 trainer.fit(model, datamodule=dm)
