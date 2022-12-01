@@ -11,14 +11,14 @@ from pytorch_lightning import LightningModule
 # base torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
+import torchmetrics as tm
 import torch.nn as nn
-import torchmetrics
 import torch
 
 # numpy
 import numpy as np
 
-from s3ts.network_aux import ConvEncoder, ConvDecoder, LinSeq
+from s3ts.network_aux import ConvEncoder, LinSeq, ConvDecoder
 from s3ts.data_str import TaskParameters
 
 import logging
@@ -42,6 +42,7 @@ class MultitaskModel(LightningModule):
         ):
 
         super().__init__()
+        self.save_hyperparameters()
 
         self.n_labels = n_labels
         self.n_patterns = n_patterns
@@ -94,19 +95,12 @@ class MultitaskModel(LightningModule):
         #     img_width=self.conv_encoder.encoder_img_width,
         #     encoder_feats=self.conv_encoder.encoder_feats)
 
-        self.train_acc = torchmetrics.Accuracy()
-        self.train_f1 = torchmetrics.F1Score(num_classes=n_patterns, average="micro")
-        self.train_auroc = torchmetrics.AUROC(num_classes=n_patterns, average="macro")
+        for phase in ["train", "val", "test"]:
+            self.__setattr__(phase + "_acc", tm.Accuracy())
+            self.__setattr__(phase + "_f1",  tm.F1Score(num_classes=n_patterns, average="micro"))
+            self.__setattr__(phase + "_auroc", tm.AUROC(num_classes=n_patterns, average="macro"))
 
-        self.val_acc = torchmetrics.Accuracy()
-        self.val_f1 = torchmetrics.F1Score(num_classes=n_patterns, average="micro")
-        self.val_auroc = torchmetrics.AUROC(num_classes=n_patterns, average="macro")
-
-        self.test_acc = torchmetrics.Accuracy()
-        self.test_f1 = torchmetrics.F1Score(num_classes=n_patterns, average="micro")
-        self.test_auroc = torchmetrics.AUROC(num_classes=n_patterns, average="macro")
-
-    # TODO
+    # TODO qué pereza, innecesario
     # def get_output_shape(self):
     #     return None
 
@@ -141,13 +135,16 @@ class MultitaskModel(LightningModule):
 
     def predict_step(self, batch, batch_idx):
 
-        """ Just calls forward, can be used to predict. """
+        """ Prediction step, skips auxiliary tasks. """
 
-        # this calls forward
-        return self(batch)
+        shared = self.conv_encoder(batch)
+        result = self.main_decoder(shared)
+        return result
 
-    # TODO
+
     def _inner_step(self, x, y):
+
+        """ Common actions for training, test and eval steps. """
         
         results = self(x)
         olabel, dlabel, dlabel_pred = y
@@ -168,14 +165,14 @@ class MultitaskModel(LightningModule):
             y_true_disc = F.one_hot(dlabel, num_classes=self.tasks.discrete_intervals).float()
             disc_loss = F.cross_entropy(disc_out, y_true_disc)
             losses.append(disc_loss)
-            weights.append(1)
+            weights.append(self.tasks.disc_weight)
             counter += 1
 
         if self.tasks.pred:
             pred_out = results[counter]
             y_true_pred = F.one_hot(dlabel_pred, num_classes=self.tasks.discrete_intervals).float()
             pred_loss = F.cross_entropy(pred_out, y_true_pred)
-            losses.append(pred_loss)
+            losses.append(self.tasks.pred_weight)
             weights.append(1)
             counter += 1
 
@@ -189,7 +186,7 @@ class MultitaskModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        """ Complete training loop. """
+        """ Training step. """
 
         self.main_task_only = False
 
@@ -208,7 +205,7 @@ class MultitaskModel(LightningModule):
     
     def _custom_stats_step(self, batch, stage=None):
         
-        """ Common actions for validation and test step. """
+        """ Common actions for val and test step. """
 
         x, y = batch
         loss, y_pred = self._inner_step(x, y)
@@ -226,15 +223,16 @@ class MultitaskModel(LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
+        """ Validation step. """
         return self._custom_stats_step(batch, "val")
 
     def test_step(self, batch, batch_idx):
+        """ Test step. """
         return self._custom_stats_step(batch, "test")
 
     # EPOCH END
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-    # TODO
     def training_epoch_end(self, training_step_outputs):
 
         """ Actions to carry out at the end of each epoch. """
@@ -261,6 +259,7 @@ class MultitaskModel(LightningModule):
             acc_metric = self.val_acc
             f1_metric = self.val_f1
             auroc_metric = self.val_auroc
+
         elif stage == "test":
             acc_metric = self.test_acc
             f1_metric = self.test_f1
@@ -294,7 +293,6 @@ class MultitaskModel(LightningModule):
     # OPTIMIZERS
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-    # TOCHECK
     def configure_optimizers(self):
 
         """ Define optimizers and LR schedulers. """

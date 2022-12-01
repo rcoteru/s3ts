@@ -6,6 +6,7 @@ alone and with shifted discrete label pretrains.
 """
 
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning import Trainer, seed_everything
 
 #from pytorch_lightning import 
@@ -38,8 +39,6 @@ tasks = TaskParameters(
     pred=True,
 )
 
-
-
 print("Computing dataset...")
 start_time = time.perf_counter()
 dm = MTaskDataModule(
@@ -69,10 +68,11 @@ print(end_time - start_time, "seconds")
 
 print("Setup the trainer...")
 start_time = time.perf_counter()
+early_stop = EarlyStopping(monitor="val_auroc", mode="min", patience=5)
 lr_monitor = LearningRateMonitor(logging_interval='step')
 model_checkpoint = ModelCheckpoint(dm.exp_path, save_last=True)
 trainer = Trainer(default_root_dir=dm.exp_path,
-    callbacks=[lr_monitor, model_checkpoint],
+    callbacks=[lr_monitor, model_checkpoint, early_stop],
     max_epochs=100, check_val_every_n_epoch=1,
     deterministic = True)
 end_time = time.perf_counter()

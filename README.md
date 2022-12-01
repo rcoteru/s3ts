@@ -4,9 +4,9 @@ Time-series classification though convolutional neural networks, where the time-
 
 The tasks include:
 
- - Classification of a discretized version of the time-series 
+ - Classification of a discretized version of the time-series.
  - Prediction of the time series, either regression or classification.
- - Convolutional autoencoder of the sliding frames.
+ - Convolutional autoencoder of the sliding frames. (TODO)
 
 ## Environment / Setup
 

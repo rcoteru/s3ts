@@ -27,6 +27,7 @@ class LinSeq(LightningModule):
         ) -> None:
 
         super().__init__()
+        self.save_hyperparameters()
         
         self.in_features = in_features
         
@@ -60,6 +61,7 @@ class ConvEncoder(LightningModule):
         dropout: float = 0.0) -> None:
 
         super().__init__()
+        self.save_hyperparameters()
         
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -142,6 +144,7 @@ class ConvDecoder(LightningModule):
         ) -> None:
 
         super().__init__()
+        self.save_hyperparameters()
         
         self.in_channels = in_channels
         self.out_channels = out_channels
