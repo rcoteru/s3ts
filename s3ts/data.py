@@ -116,12 +116,13 @@ class MTaskDataModule(LightningDataModule):
 
     def __init__(self, 
             experiment: str,
-            dataset: str, 
-            sts_length: int,
+            X: np.ndarray,
+            Y: np.ndarray,
             window_size: int, 
             tasks: TaskParameters,
             # aux_patts: list[function], # TODO add
             batch_size: int,
+            sts_length: int = None,
             random_state: int = 0,
             test_size: float = 0.3,
             rho_memory: float = 0.1,
@@ -138,10 +139,19 @@ class MTaskDataModule(LightningDataModule):
         # ~~~~~~~~~~~~~~ input checks ~~~~~~~~~~~~~~ 
         
         self.experiment = experiment
-        self.dataset = dataset
         self.tasks = tasks
 
-        if sts_length <= 5:
+        if len(X.shape) != 2:
+            raise ValueError("X should be two-dimensional!")
+        if len(Y.shape) != 1:
+            raise ValueError("Y should be two-dimensional!")
+        if X.shape[0] != Y.shape[0]:
+            raise ValueError(f"Different sample number in X ('{X.shape[0]}') and Y ('{Y.shape[0]}')")
+        
+        Y = Y.astype(np.int8)
+        self.X, self.Y = X, Y
+
+        if sts_length is not None and sts_length <= 5:
             raise ValueError(f"Invalid sts_length '{sts_length}'")
         self.sts_length = sts_length 
 
@@ -198,15 +208,15 @@ class MTaskDataModule(LightningDataModule):
 
         # validation dataset
         self.ds_eval = MTaskDataset(tasks=tasks,
-            frames=self.frames_train, series=self.series_train,
-            olabels=self.olabels_train, dlabels=self.dlabels_train,
+            frames=self.frames_test, series=self.series_test,
+            olabels=self.olabels_test, dlabels=self.dlabels_test,
             indexes=self.indexes_eval, window_size=self.window_size,
             transform=transform)
 
         # test dataset
         self.ds_test = MTaskDataset(tasks=tasks,
-            frames=self.frames_train, series=self.series_train,
-            olabels=self.olabels_train, dlabels=self.dlabels_train,
+            frames=self.frames_test, series=self.series_test,
+            olabels=self.olabels_test, dlabels=self.dlabels_test,
             indexes=self.indexes_test, window_size=self.window_size,
             transform=transform)
 
@@ -227,7 +237,7 @@ class MTaskDataModule(LightningDataModule):
         #if computation has already been done, just load it
         if (not force) and save_path.is_file():
             with np.load(save_path, allow_pickle=True) as data:
-                self.X, self.Y, self.mapping = data["X"], data["Y"], data["mapping"]
+                self.X, self.Y = data["X"], data["Y"]
                 self.n_labels = int(len(np.unique(self.Y)))
                 self.sample_length = self.X.shape[1]
                 self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(self.X, self.Y, 
@@ -242,7 +252,6 @@ class MTaskDataModule(LightningDataModule):
             return
         
         # grab the data from the internet
-        self.X, self.Y, self.mapping = download_dataset(self.dataset)
         self.n_labels = int(len(np.unique(self.Y)))
         self.sample_length = self.X.shape[1]
 
@@ -253,17 +262,23 @@ class MTaskDataModule(LightningDataModule):
         # compute medoids 
         self.medoids, self.medoid_ids = compute_medoids(self.X_train, self.Y_train, distance_type=self.distance_type)
 
+        if self.sts_length is None:
+            length_train, length_test = None, None
+        else:
+            length_train, length_test = self.sts_length, self.sts_length
+            
         # create train STS from samples
         self.series_train, self.olabels_train = build_STS(X=self.X_train, Y=self.Y_train, 
-            sts_length=self.extra_samples+self.sts_length, random_state=self.random_state,
-            aug_probs=self.aug_probs) #, skip_ids=medoid_ids)
+            sts_length=length_train, buffer_length=self.extra_samples, 
+            random_state=self.random_state, aug_probs=self.aug_probs) #, skip_ids=medoid_ids)
+        
         self.train_length = len(self.olabels_train)
         self.olabels_train = self.olabels_train.astype(int)
 
         # create test STS from samples TODO hacer que no sea aleatorio, longitud tamaño test
         self.series_test, self.olabels_test = build_STS(X=self.X_test, Y=self.Y_test, 
-            sts_length=self.extra_samples+self.sts_length, random_state=self.random_state,
-            aug_probs=None)
+            sts_length=length_test, buffer_length=self.extra_samples, 
+            random_state=self.random_state, aug_probs=None)
         self.test_length = len(self.olabels_test)
         self.olabels_test = self.olabels_test.astype(int)
 
@@ -272,8 +287,7 @@ class MTaskDataModule(LightningDataModule):
         self.frames_test = compute_OESM_parallel(self.series_test, patterns=self.medoids, rho=self.rho_memory)
 
         # save everything to a file
-        np.savez_compressed(save_path,
-            X=self.X, Y=self.Y, mapping=self.mapping, 
+        np.savez_compressed(save_path, X=self.X, Y=self.Y,
             medoids=self.medoids, medoid_ids=self.medoid_ids,
             series_train=self.series_train, olabels_train=self.olabels_train,
             series_test=self.series_test,   olabels_test=self.olabels_test, 
@@ -304,21 +318,17 @@ class MTaskDataModule(LightningDataModule):
 
         """ Generates arrays with valid indexes. """
 
-        start_buff = self.sample_length*self.extra_samples
-        
-        # if self.tasks.pred:
+        start_buff = self.sample_length*self.extra_samples + self.window_size
+
         end_buff = self.window_size if self.tasks.pred_time is None else self.tasks.pred_time 
         train_end = self.train_length - end_buff
         test_end = self.test_length - end_buff
-        # else:
-        #     train_end = self.train_length
-        #     test_end = self.test_length
 
         train_length = train_end - start_buff
         test_length = test_end - start_buff
 
-        self.indexes_test = np.arange(start_buff, start_buff + test_length//2)
-        self.indexes_eval = np.arange(start_buff + test_length//2, test_end)
+        self.indexes_test = np.arange(start_buff, start_buff + test_length//4)
+        self.indexes_eval = np.arange(start_buff + test_length//4, test_end)
         self.indexes_train = np.arange(start_buff, train_end)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

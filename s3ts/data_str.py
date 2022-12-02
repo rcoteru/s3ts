@@ -15,7 +15,10 @@ class TaskParameters:
     pred_time: int = None           # Prediction time (if None, then window_size)
     pred_weight: int = 1
 
+    auto: bool = True               # Auto prediction
+
     aenc: bool = True               # Autoencoder
+    aenc_weight: int = 1
 
 @dataclass
 class AugProbabilities:

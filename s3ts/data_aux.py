@@ -155,10 +155,19 @@ def build_STS(
         X: np.ndarray, 
         Y: np.ndarray, 
         sts_length: int,
+        buffer_length: int,
         skip_ids: list[int] = [],
         aug_probs: AugProbabilities = None,
         random_state: int = 0,
         ) -> tuple[np.ndarray, np.ndarray]:
+
+    """
+    Builds an STS from and array of samples and labels.
+
+    If sts_length is an int, builds it from randomly picked samples.
+    If sts_length is None, builds it with a randomly sampled permutation of them. 
+    
+    """
 
     assert(X.shape[0] == Y.shape[0])
     nsamples = X.shape[0]
@@ -166,13 +175,33 @@ def build_STS(
     assert(len(X.shape) == 2)
     s_length = X.shape[1]
 
-    STS_X = np.empty(sts_length*s_length)
-    STS_Y = np.empty(sts_length*s_length)
+    if sts_length is None:
+        STS_X = np.empty((buffer_length + nsamples)*s_length)
+        STS_Y = np.empty((buffer_length + nsamples)*s_length)
+    else:
+        STS_X = np.empty((buffer_length + sts_length)*s_length)
+        STS_Y = np.empty((buffer_length + sts_length)*s_length)
+
+    # TODO implement augmentations
+    def augment(sample: np.ndarray):
+        if rng.random() <= aug_probs.jitter:
+            sample = sample
+        if rng.random() <= aug_probs.scaling:
+            sample = sample
+        if rng.random() <= aug_probs.time_warp:
+            sample = sample
+        if rng.random() <= aug_probs.window_warp:
+            sample = sample
 
     rng = np.random.default_rng(seed=random_state)
 
-    for r in range(sts_length):
+    if sts_length is None:
+        random_fill = buffer_length
+    else:
+        random_fill = buffer_length + sts_length
 
+    # fill with randomly picked smples
+    for r in range(random_fill):
         while True:
             random_idx = rng.integers(0, nsamples)
             if random_idx in skip_ids:
@@ -183,18 +212,25 @@ def build_STS(
         sample = X[random_idx,:].copy()
         label = Y[random_idx]
 
-        # TODO implement augmentations
         if aug_probs is not None:
-            if rng.random() <= aug_probs.jitter:
-                sample = sample
-            if rng.random() <= aug_probs.scaling:
-                sample = sample
-            if rng.random() <= aug_probs.time_warp:
-                sample = sample
-            if rng.random() <= aug_probs.window_warp:
-                sample = sample
-
+            sample = augment(sample)
+        
         STS_X[r*s_length:(r+1)*s_length] = sample
         STS_Y[r*s_length:(r+1)*s_length] = label
+
+    # fill with random permutation of samples
+    if sts_length is None:
+
+        for r, idx in enumerate(rng.permutation(np.arange(nsamples))):
+
+            r = r + random_fill
+            sample = X[idx,:].copy()
+            label = Y[idx]
+
+            if aug_probs is not None:
+                sample = augment(sample)
+
+            STS_X[r*s_length:(r+1)*s_length] = sample
+            STS_Y[r*s_length:(r+1)*s_length] = label
 
     return STS_X, STS_Y

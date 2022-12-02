@@ -157,7 +157,7 @@ class MultitaskModel(LightningModule):
         y_true_main = F.one_hot(olabel, num_classes=self.n_labels).float()
         main_loss = F.cross_entropy(main_out, y_true_main)
         losses.append(main_loss)
-        weights.append(3)
+        weights.append(self.tasks.main_weight)
         counter += 1
 
         if self.tasks.disc:
@@ -172,11 +172,16 @@ class MultitaskModel(LightningModule):
             pred_out = results[counter]
             y_true_pred = F.one_hot(dlabel_pred, num_classes=self.tasks.discrete_intervals).float()
             pred_loss = F.cross_entropy(pred_out, y_true_pred)
-            losses.append(self.tasks.pred_weight)
-            weights.append(1)
+            losses.append(pred_loss)
+            weights.append(self.tasks.pred_weight)
             counter += 1
 
-        #aenc_loss = F.mse_loss(aenc_out, x)
+        if self.tasks.aenc:
+            aenc_out = results[counter]
+            aenc_loss = F.mse_loss(aenc_out, x)
+            losses.append(aenc_loss)
+            weights.append(self.tasks.aenc_weight)
+            counter += 1
 
         W = torch.tensor(weights, dtype=torch.float32)
         A = torch.stack(losses)
@@ -244,12 +249,12 @@ class MultitaskModel(LightningModule):
         # log metrics
         self.log("epoch_train_accuracy", train_accuracy, prog_bar=True, sync_dist=True)
         self.log("epoch_train_f1", train_f1, prog_bar=True, sync_dist=True)
-
+        
         # reset all metrics
         self.train_acc.reset()
         self.train_f1.reset()
-        self.train_auroc.reset()
-        print(f"\ntraining accuracy: {train_accuracy:.4}, " f"f1: {train_f1:.4}")
+        print(f"\nAccuracy: {train_accuracy:.4}")
+        print(f"F1 Score: {train_f1:.4}")
 
     def _custom_epoch_end(self, step_outputs, stage):
 
