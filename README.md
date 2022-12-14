@@ -6,7 +6,8 @@ The tasks include:
 
  - Classification of a discretized version of the time-series.
  - Prediction of the time series, either regression or classification.
- - Convolutional autoencoder of the sliding frames. (TODO)
+ - Regression of the original time series.
+ - Regression of the sliding frames.
 
 ## Environment / Setup
 
@@ -19,19 +20,7 @@ pip install -r requirements.txt                 # install dependencies
 python -m pip install -e .                      # install dev package
 ```
 
-### Things to check
-- Influence of shifting labels in the pretrain
-- Performance with ratios of train/pretrain
-
-### Ideas
-- Use [learned shapelets](https://www.ismll.uni-hildesheim.de/pub/pdfs/grabocka2014e-kdd.pdf) instead of medoids as patterns.
-- Use artificial patterns alongside the medoids
-- Use only artifical patterns -> zero-shot learning!
-- Include data augmentation techniques
-
-
-### TODO's
-- Generalize model training / saving
-- Gather training stats automatically
-- Do some nice plotting
-- Multiseed checks
+## Visualize Training Progress
+```bash
+tensorboard --logdir=data/[whatever-dir-name]/lightning_logs/
+```

@@ -19,11 +19,10 @@ import time
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-EXPERIMENT = "test_pretrain"
+EXPERIMENT = "multitask_GP"
 DATASET = "GunPoint"
 
-PRET_SIZE = 0.5
-TEST_SIZE = 0.5
+TEST_SIZE = 0.8
 STS_LENGTH = None
 
 WINDOW_SIZE = 10
@@ -35,7 +34,7 @@ seed_everything(RANDOM_STATE)
 
 probs = AugProbabilities()
 tasks = TaskParameters(
-    main_weight=1,
+    main_weight=3,
     disc=True,
     disc_weight=1,
     discrete_intervals=5,
@@ -49,34 +48,15 @@ tasks = TaskParameters(
 print("Downloading data...")
 start_time = time.perf_counter()
 X, Y, mapping = download_dataset(DATASET)
-n_samples = X.shape[0]
-X_pret, X_train = X[:X,:]
-
 end_time = time.perf_counter()
 print("DONE! ", end_time - start_time, "seconds")
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-print("Computing dataset for pretrain...")
+print("Computing dataset...")
 start_time = time.perf_counter()
 dm = MTaskDataModule(
-    experiment=EXPERIMENT / "pretrain",
-    X=X, Y=Y,
-    sts_length=STS_LENGTH,
-    window_size=WINDOW_SIZE,
-    tasks=tasks,
-    batch_size=BATCH_SIZE,
-    test_size=TEST_SIZE,
-    random_state=RANDOM_STATE)
-end_time = time.perf_counter()
-print("DONE! ", end_time - start_time, "seconds")
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-
-print("Computing dataset for train...")
-start_time = time.perf_counter()
-dm = MTaskDataModule(
-    experiment=EXPERIMENT / "pretrain",
+    experiment=EXPERIMENT,
     X=X, Y=Y,
     sts_length=STS_LENGTH,
     window_size=WINDOW_SIZE,

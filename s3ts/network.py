@@ -66,34 +66,45 @@ class MultitaskModel(LightningModule):
         encoder_out_feats = self.conv_encoder.get_output_shape()
 
         # main classification
-        self.main_decoder = nn.Sequential(
-            LinSeq(in_features=encoder_out_feats,
-            hid_features=encoder_out_feats*2,
-            out_features=self.n_labels,
-            hid_layers=0), nn.Softmax())
+        if self.tasks.main:
+            self.main_decoder = nn.Sequential(
+                LinSeq(in_features=encoder_out_feats,
+                hid_features=encoder_out_feats*2,
+                out_features=self.n_labels,
+                hid_layers=0), nn.Softmax())
 
         # discretized classification
-        self.disc_decoder = nn.Sequential(
-            LinSeq(in_features=encoder_out_feats,
-            hid_features=encoder_out_feats*2,
-            out_features=tasks.discrete_intervals,
-            hid_layers=0), nn.Softmax())
+        if self.tasks.disc:
+            self.disc_decoder = nn.Sequential(
+                LinSeq(in_features=encoder_out_feats,
+                hid_features=encoder_out_feats*2,
+                out_features=tasks.discrete_intervals,
+                hid_layers=0), nn.Softmax())
 
         # discretized prediction decoder
-        self.pred_decoder = nn.Sequential(
-            LinSeq(in_features=encoder_out_feats,
-            hid_features=encoder_out_feats*2,
-            out_features=tasks.discrete_intervals,
-            hid_layers=0), nn.Softmax())
-            
-        # autoencoder
-        # self.conv_decoder = ConvDecoder(
-        #     in_channels=max_feature_maps,
-        #     out_channels=n_patterns,
-        #     conv_kernel_size=3,
-        #     img_height=self.conv_encoder.encoder_img_height,
-        #     img_width=self.conv_encoder.encoder_img_width,
-        #     encoder_feats=self.conv_encoder.encoder_feats)
+        if self.tasks.pred:
+            self.pred_decoder = nn.Sequential(
+                LinSeq(in_features=encoder_out_feats,
+                hid_features=encoder_out_feats*2,
+                out_features=tasks.discrete_intervals,
+                hid_layers=0), nn.Softmax())
+
+        # time series regression
+        if self.tasks.areg_ts:
+            self.areg_ts_decoder = LinSeq(in_features=encoder_out_feats,
+                hid_features=encoder_out_feats*2,
+                out_features=self.window_size,
+                hid_layers=1)
+
+        # similarity frame regression
+        if self.tasks.areg_img:
+            self.areg_img_decoder = ConvDecoder(
+                in_channels=max_feature_maps,
+                out_channels=n_patterns,
+                conv_kernel_size=3,
+                img_height=self.conv_encoder.encoder_img_height,
+                img_width=self.conv_encoder.encoder_img_width,
+                encoder_feats=self.conv_encoder.encoder_feats)                   
 
         for phase in ["train", "val", "test"]:
             self.__setattr__(phase + "_acc", tm.Accuracy())
@@ -104,13 +115,12 @@ class MultitaskModel(LightningModule):
     # def get_output_shape(self):
     #     return None
 
-    def forward(self, x):
+    def forward(self, frame, ts):
 
         """ Use for inference only (separate from training_step)"""
 
-        shared = self.conv_encoder(x)
+        shared = self.conv_encoder(frame)
         results = []
-
 
         # main task
         main_out = self.main_decoder(shared)
@@ -118,15 +128,13 @@ class MultitaskModel(LightningModule):
 
         # auxiliary tasks
         if self.tasks.disc:
-            disc_out = self.disc_decoder(shared)
-            results.append(disc_out)
+            results.append(self.disc_decoder(shared))
         if self.tasks.pred:
-            pred_out = self.pred_decoder(shared)
-            results.append(pred_out)
-        if self.tasks.aenc:
-            # aenc_out = self.conv_decoder(shared)
-            # results.append(aenc_out)
-            pass
+            results.append(self.pred_decoder(shared))
+        if self.tasks.areg_ts:
+            results.append(self.areg_ts_decoder(shared))
+        if self.tasks.areg_img:
+            results.append(self.areg_img_decoder(shared))
 
         return results
 
@@ -176,11 +184,18 @@ class MultitaskModel(LightningModule):
             weights.append(self.tasks.pred_weight)
             counter += 1
 
-        if self.tasks.aenc:
-            aenc_out = results[counter]
-            aenc_loss = F.mse_loss(aenc_out, x)
-            losses.append(aenc_loss)
-            weights.append(self.tasks.aenc_weight)
+        if self.tasks.areg_ts:
+            areg_ts_out = results[counter]
+            areg_ts_loss = F.mse_loss(areg_ts_out, x)
+            losses.append(areg_ts_loss)
+            weights.append(self.tasks.areg_ts_weight)
+            counter += 1
+
+        if self.tasks.areg_img:
+            areg_img_out = results[counter]
+            areg_img_loss = F.mse_loss(areg_img_out, x)
+            losses.append(areg_img_loss)
+            weights.append(self.tasks.areg_img_weight)
             counter += 1
 
         W = torch.tensor(weights, dtype=torch.float32)

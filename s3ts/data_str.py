@@ -17,8 +17,11 @@ class TaskParameters:
 
     auto: bool = True               # Auto prediction
 
-    aenc: bool = True               # Autoencoder
-    aenc_weight: int = 1
+    areg_ts: bool = True            # Time-Series Autoregression
+    areg_ts_weight: int = 1
+
+    areg_img: bool = True           # Similarity Frame Autoregression
+    areg_img_weight: int = 1
 
 @dataclass
 class AugProbabilities:
