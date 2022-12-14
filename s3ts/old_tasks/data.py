@@ -4,11 +4,11 @@ Automation of the data manipulation tasks.
 
 # import library functions / objects
 from s3ts.datasets.processing import acquire_dataset, compute_medoids, build_STS, discretize_TS
-from s3ts.datasets.oesm import compute_OESM_parallel
+from s3ts.oesm import compute_OESM_parallel
 from s3ts.datasets.modules import ESM_DM
 
 # import constants
-from s3ts.tasks import data_folder, base_main_fname, base_task_fname
+from s3ts.old_tasks import data_folder, base_main_fname, base_task_fname
 from s3ts import RANDOM_STATE
 
 from sklearn.model_selection import train_test_split
