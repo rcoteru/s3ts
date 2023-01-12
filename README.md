@@ -2,6 +2,8 @@
 
 Time-series classification though convolutional neural networks, where the time-series data is converted to images through an online, DTW-based (Dynamic Time Warping) similarity measure. Additional tasks are used during training to improve generalization, derived only from the original dataset without any additional data. 
 
+Pretrain:
+
 The tasks include:
 
  - Classification of a discretized version of the time-series.
