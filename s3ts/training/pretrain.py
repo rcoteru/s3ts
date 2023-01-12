@@ -5,6 +5,8 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
+from pytorch_lightning.loggers import TensorBoardLogger
+
 def pretrain_encoder(
     arch: type[LightningModule],
     dm: LightningDataModule,
@@ -13,18 +15,27 @@ def pretrain_encoder(
 
     # 1. create model used for pretrain
 
-    model = 
+    model = 1
 
     # 3. train the model
 
+    # logger 
+    tb_logger = TensorBoardLogger(save_dir="", name="lightning_logs")
+
+    # early stop the model
     early_stop = EarlyStopping(monitor="val_auroc", mode="max", patience=5)
 
+    # logger for learning rate
     lr_monitor = LearningRateMonitor(logging_interval='step')
+    
+    # save checkpoints for the model
     model_checkpoint = ModelCheckpoint(pretrain_dm.exp_path, save_last=True)
     
     trainer = Trainer(default_root_dir=pretrain_dm.exp_path,
+        logger = tb_logger, 
         callbacks=[lr_monitor, model_checkpoint, early_stop],
-        max_epochs=100, check_val_every_n_epoch=1,
+        max_epochs=100, 
+        log_every_n_steps=1, check_val_every_n_epoch=1,
         deterministic = True)
 
     # 3. train the model

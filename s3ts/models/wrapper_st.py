@@ -56,63 +56,23 @@ class MultitaskModel(LightningModule):
 
         self.learning_rate = learning_rate
 
+        # encoder
         self.encoder = arch(
             ref_size=patt_length, 
             channels=n_patterns, 
             window_size=window_size)
-
-        encoder_out_feats = self.conv_encoder.get_output_shape()
         
-        if self.tasks.main: # main classification
-            self.main_decoder = nn.Sequential(
-                LinSeq(in_features=encoder_out_feats,
-                hid_features=encoder_out_feats*2,
-                out_features=self.n_labels,
-                hid_layers=0), nn.Softmax())
-        
-        if self.tasks.disc: # discretized classification
-            self.disc_decoder = nn.Sequential(
-                LinSeq(in_features=encoder_out_feats,
-                hid_features=encoder_out_feats*2,
-                out_features=tasks.discrete_intervals,
-                hid_layers=0), nn.Softmax())
-    
-        if self.tasks.pred: # discretized prediction decoder
-            self.pred_decoder = nn.Sequential(
-                LinSeq(in_features=encoder_out_feats,
-                hid_features=encoder_out_feats*2,
-                out_features=tasks.discrete_intervals,
-                hid_layers=0), nn.Softmax())
-
-        if self.tasks.areg_ts: # time series regression
-            self.areg_ts_decoder = LinSeq(in_features=encoder_out_feats,
-                hid_features=encoder_out_feats*2,
-                out_features=self.window_size,
-                hid_layers=0)
-
-        if self.tasks.areg_img: # similarity frame regression
-            self.areg_img_decoder = ConvDecoder(
-                in_channels=max_feature_maps,
-                out_channels=n_patterns,
-                conv_kernel_size=3,
-                img_height=self.conv_encoder.encoder_img_height,
-                img_width=self.conv_encoder.encoder_img_width,
-                encoder_feats=self.conv_encoder.encoder_feats) 
+        # decoder
+        self.decoder = nn.Sequential(
+            nn.Linear(in_features=self.encoder.get_output_shape(), 
+            out_features=n_labels), nn.Softmax())
 
         # configure loggers
-        names = [
-            ("main", n_patterns), 
-            ("disc", self.tasks.discrete_intervals), 
-            ("pred", self.tasks.discrete_intervals)
-            ]
-        flags = [self.tasks.main, self.tasks.disc, self.tasks.pred]
-        for (name, nclas), flag in itertools.product(names, flags):
-            if flag:
-                for phase in ["train", "val", "test"]:
-                        self.__setattr__(f"{name}_{phase}_acc", tm.Accuracy(num_classes=nclas, task="multiclass"))
-                        self.__setattr__(f"{name}_{phase}_f1",  tm.F1Score(num_classes=nclas, task="multiclass", average="micro",))
-                        if phase != "train":
-                            self.__setattr__(f"{name}_{phase}_auroc", tm.AUROC(num_classes=nclas, task="multiclass", average="macro"))
+        for phase in ["train", "val", "test"]:
+            self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=n_labels, task="multiclass"))
+            self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=n_labels, task="multiclass", average="micro",))
+            if phase != "train":
+                self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=n_labels, task="multiclass", average="macro"))
 
     # FORWARD
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

@@ -2,9 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class TaskParameters:
-
     """ Settings for the auxiliary tasks. """
-
     main: bool = True               # Main Label Classification
     main_weight: int = 3            # Main Label Classification Weight
     
