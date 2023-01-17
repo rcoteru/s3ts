@@ -7,7 +7,16 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 from pytorch_lightning.loggers import TensorBoardLogger
 
+
+
+from s3ts.models.base import BasicModel
+
+
 def pretrain_encoder(
+    n_labels: int,
+    n_patterns: int, 
+    l_patterns: int,
+    window_size: int,
     arch: type[LightningModule],
     dm: LightningDataModule,
     ) -> LightningModule:
@@ -15,7 +24,7 @@ def pretrain_encoder(
 
     # 1. create model used for pretrain
 
-    model = 1
+    model = BasicModel(dm.n_labels)
 
     # 3. train the model
 

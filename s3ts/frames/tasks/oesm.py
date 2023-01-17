@@ -276,7 +276,7 @@ def compute_OESM_sc(
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def compute_OESM_parallel(
+def compute_OESM(
         STS: np.ndarray, 
         patterns: np.ndarray,
         rho: float,
@@ -293,7 +293,7 @@ def compute_OESM_parallel(
     # IDs to send to each process
     patt_ids = np.arange(n_patts).tolist()
 
-    # INFO: "partial" basically makes "wrapper_compute" take only the data as argument
+    # INFO: "partial" basically makes "compute_OESM_sc" take only the data as argument
     compute_OESM_sc_call = partial(compute_OESM_sc, STS=STS, patterns=patterns, rho=scaled_rho)
 
     with mp.Pool(processes=nprocs) as pool:

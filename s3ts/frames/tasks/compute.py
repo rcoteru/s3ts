@@ -52,14 +52,12 @@ def compute_medoids(
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def build_STS(
+def compute_STS(
         X: np.ndarray, 
         Y: np.ndarray, 
-        sts_length: int,
-        buffer_length: int,
-        skip_ids: list[int] = [],
-        aug_probs: AugProbabilities = None,
         random_state: int = 0,
+        nsamples_sts: int = None,
+        skip_ids: list[int] = []
         ) -> tuple[np.ndarray, np.ndarray]:
 
     """
@@ -74,71 +72,38 @@ def build_STS(
     nsamples = X.shape[0]
 
     assert(len(X.shape) == 2)
-    s_length = X.shape[1]
-
-    if sts_length is None:
-        STS_X = np.empty((buffer_length + nsamples)*s_length)
-        STS_Y = np.empty((buffer_length + nsamples)*s_length)
-    else:
-        STS_X = np.empty((buffer_length + sts_length)*s_length)
-        STS_Y = np.empty((buffer_length + sts_length)*s_length)
-
-    # TODO implement augmentations
-    def augment(sample: np.ndarray):
-        if rng.random() <= aug_probs.jitter:
-            sample = sample
-        if rng.random() <= aug_probs.scaling:
-            sample = sample
-        if rng.random() <= aug_probs.time_warp:
-            sample = sample
-        if rng.random() <= aug_probs.window_warp:
-            sample = sample
+    sample_length = X.shape[1]
 
     rng = np.random.default_rng(seed=random_state)
 
-    if sts_length is None:
-        random_fill = buffer_length
-    else:
-        random_fill = buffer_length + sts_length
-
-    # fill with randomly picked smples
-    for r in range(random_fill):
-        while True:
-            random_idx = rng.integers(0, nsamples)
-            if random_idx in skip_ids:
-                continue
-            else:
-                break
-
-        sample = X[random_idx,:].copy()
-        label = Y[random_idx]
-
-        if aug_probs is not None:
-            sample = augment(sample)
+    if nsamples_sts is None:
         
-        STS_X[r*s_length:(r+1)*s_length] = sample
-        STS_Y[r*s_length:(r+1)*s_length] = label
-
-    # fill with random permutation of samples
-    if sts_length is None:
+        STS_X = np.empty(nsamples*sample_length)
+        STS_Y = np.empty(nsamples*sample_length)
 
         for r, idx in enumerate(rng.permutation(np.arange(nsamples))):
-
-            r = r + random_fill
+            
             sample = X[idx,:].copy()
             label = Y[idx]
 
-            if aug_probs is not None:
-                sample = augment(sample)
+            STS_X[r*sample_length:(r+1)*sample_length] = sample
+            STS_Y[r*sample_length:(r+1)*sample_length] = label
 
-            STS_X[r*s_length:(r+1)*s_length] = sample
-            STS_Y[r*s_length:(r+1)*s_length] = label
+    else:
+        STS_X = np.empty(nsamples_sts*sample_length)
+        STS_Y = np.empty(nsamples_sts*sample_length)
+
+        for r in range(nsamples_sts):
+            while True:
+                random_idx = rng.integers(0, nsamples)
+                if random_idx in skip_ids:
+                    continue
+                else:
+                    break
+
+            STS_X[r*sample_length:(r+1)*sample_length] = X[random_idx,:]
+            STS_Y[r*sample_length:(r+1)*sample_length] = Y[random_idx]
 
     return STS_X, STS_Y
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-
-def compute_OESM():
-
-
-    pass
