@@ -64,9 +64,9 @@ class BaseDataModule(LightningDataModule):
             # ~~~~~~~~~~~~~~~~~~~~~~
             window_size: int, 
             batch_size: int,
+            test_size: float,
             random_state: int = 0,
-            eval_size: float = 0.15,
-            test_size: float = 0.15
+            eval_size: float = 0.10,
             ) -> None:
         
         super().__init__()
@@ -90,9 +90,13 @@ class BaseDataModule(LightningDataModule):
         self.num_workers = mp.cpu_count()//2
 
         # generate train/eval/test indexes
-        indexes = np.arange(self.window_size*3, self.l_DFS)
-        br1, br2 = int(len(indexes)*(1-test_size-eval_size)), int(len(indexes)*(1-test_size))
-        self.train_idx, self.eval_idx, self.test_idx = indexes[:br1], indexes[br1:br2], indexes[br2:]
+        br0 = self.window_size*3
+        br1 = int(self.l_DFS*(1-test_size-eval_size)) + window_size
+        br2 = int(self.l_DFS*(1-test_size)) + window_size
+
+        self.train_idx = np.arange(br0, br1) 
+        self.eval_idx = np.arange(br1, br2)
+        self.test_idx = np.arange(br2, self.l_DFS)
 
         # normalization_transform
         transform = tv.transforms.Normalize(

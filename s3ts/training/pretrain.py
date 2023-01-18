@@ -1,58 +1,92 @@
+# data
+from s3ts.frames.tasks.compute import compute_medoids, compute_STS
+from s3ts.frames.tasks.oesm import compute_OESM
+from s3ts.frames.base import BaseDataModule
 
-from pytorch_lightning import LightningDataModule, LightningModule
-from pytorch_lightning import Trainer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import KBinsDiscretizer
 
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pathlib import Path
+import numpy as np
 
-from pytorch_lightning.loggers import TensorBoardLogger
+def pretrain_data_modules(
+        X: np.ndarray,
+        Y: np.ndarray,
+        ulab_frac: float,
+        test_size: float,
+        window_size: int,
+        batch_size: int,
+        rho_dfs: int,
+        random_state: int = 0,
+        cache_dir: Path = Path("cache")
+        ) -> tuple[BaseDataModule, BaseDataModule]:
 
+    # divide en labeled y unlabeled
+    X_lab, X_ulab, Y_lab, Y_ulab = train_test_split(X, Y, 
+        test_size=ulab_frac, stratify=Y, random_state=random_state, shuffle=True)
 
+    # LABELED DATASET (TRAIN)
+    # =================================
 
-from s3ts.models.base import BasicModel
+    # labeled train test split
+    X_train, X_test, Y_train, Y_test = train_test_split(X_lab, Y_lab, 
+        test_size=test_size, stratify=Y_lab, random_state=random_state,  shuffle=True)
 
+    # selecciona los patrones [n_patterns,  l_patterns]
+    medoids, medoid_ids = compute_medoids(X_train, Y_train, distance_type="dtw")
 
-def pretrain_encoder(
-    n_labels: int,
-    n_patterns: int, 
-    l_patterns: int,
-    window_size: int,
-    arch: type[LightningModule],
-    dm: LightningDataModule,
-    ) -> LightningModule:
+    # generate STS
+    STS_lab, labels_lab = compute_STS(                     
+        X_train=X_train, Y_train=Y_train,
+        X_test=X_test, Y_test=Y_test)
 
+    file_lab = "cache/lab.npy"
+    if not Path(file_lab).exists(): 
+        DFS_lab = compute_OESM(STS_lab, medoids, rho=rho_dfs)   # generate DFS
+        np.save(file_lab, DFS_lab)
+    else:
+        DFS_lab = np.load(file_lab)
 
-    # 1. create model used for pretrain
+    # create data module (train)
+    train_dm = BaseDataModule(
+        STS=STS_lab, 
+        labels=labels_lab, 
+        DFS=DFS_lab, 
+        window_size=window_size, 
+        batch_size=batch_size,
+        test_size=test_size)
 
-    model = BasicModel(dm.n_labels)
+    # UNLABELED DATASET (PRETRAIN) 
+    # =================================
 
-    # 3. train the model
+    # unlabeled train test split
+    X_train, X_test, Y_train, Y_test = train_test_split(X_ulab, Y_ulab, 
+        test_size=test_size, stratify=Y_ulab, random_state=random_state, shuffle=True)
 
-    # logger 
-    tb_logger = TensorBoardLogger(save_dir="", name="lightning_logs")
+    # generate STS (discarding labels)
+    STS_ulab, _ = compute_STS(                     
+        X_train=X_train, Y_train=Y_train,
+        X_test=X_test, Y_test=Y_test)
 
-    # early stop the model
-    early_stop = EarlyStopping(monitor="val_auroc", mode="max", patience=5)
+    file_ulab = "cache/ulab.npy"
+    if not Path(file_ulab).exists(): 
+        DFS_ulab = compute_OESM(STS_ulab, medoids, rho=rho_dfs)  # generate DFS
+        np.save(file_ulab, DFS_ulab)
+    else:
+        DFS_ulab = np.load(file_ulab)
 
-    # logger for learning rate
-    lr_monitor = LearningRateMonitor(logging_interval='step')
-    
-    # save checkpoints for the model
-    model_checkpoint = ModelCheckpoint(pretrain_dm.exp_path, save_last=True)
-    
-    trainer = Trainer(default_root_dir=pretrain_dm.exp_path,
-        logger = tb_logger, 
-        callbacks=[lr_monitor, model_checkpoint, early_stop],
-        max_epochs=100, 
-        log_every_n_steps=1, check_val_every_n_epoch=1,
-        deterministic = True)
+    # generate labels
+    kbd = KBinsDiscretizer(n_bins=3, encode="ordinal", strategy="quantile", random_state=random_state)
+    kbd.fit(STS_ulab.reshape(-1,1))
+    labels_ulab = kbd.transform(STS_ulab.reshape(-1,1)).squeeze().astype(int)
 
-    # 3. train the model
+    # create data module (pretrain)
+    pretrain_dm = BaseDataModule(
+        STS=STS_ulab, 
+        labels=labels_ulab, 
+        DFS=DFS_ulab, 
+        window_size=window_size, 
+        batch_size=batch_size,
+        test_size=test_size)
 
-    trainer.fit(pretrain_model, datamodule=pretrain_dm)
-
-    # 3. return the pretrained encoder
-
-    encoder: LightningModule 
-
-    return encoder
+    return pretrain_dm, train_dm

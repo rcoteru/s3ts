@@ -48,7 +48,7 @@ class BasicModel(LightningModule):
         self.learning_rate = learning_rate
 
         # encoder
-        self.encoder = arch(
+        self.encoder: LightningModule = arch(
             ref_size=l_patterns, 
             channels=n_patterns, 
             window_size=window_size)
@@ -81,19 +81,21 @@ class BasicModel(LightningModule):
 
     def _inner_step(self, batch, stage: str = None):
 
-        """ Common actions for training, test and eval steps. """
+        """ Common actions for training, test and val steps. """
 
         # x[0] is the time series
         # x[1] are the sim frames
         
         x, y = batch
+        x: torch.tensor
+        y: torch.tensor
 
         output = self(x)
-        loss = F.cross_entropy(output, y.float())
+        loss = F.cross_entropy(output, y.to(torch.float32))
 
         # accumulate and return metrics for logging
-        acc = self.__getattr__(f"{stage}_acc")(output, y)
-        f1  = self.__getattr__(f"{stage}_f1")(output, y)
+        acc = self.__getattr__(f"{stage}_acc")(output, torch.argmax(y, dim=1))
+        f1  = self.__getattr__(f"{stage}_f1")(output, torch.argmax(y, dim=1))
         
         if stage == "train":
             self.log(f"{stage}_loss", loss, sync_dist=True)

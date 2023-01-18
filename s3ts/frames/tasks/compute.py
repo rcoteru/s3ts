@@ -53,8 +53,10 @@ def compute_medoids(
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def compute_STS(
-        X: np.ndarray, 
-        Y: np.ndarray, 
+        X_train: np.ndarray, 
+        Y_train: np.ndarray, 
+        X_test: np.ndarray,
+        Y_test: np.ndarray,
         random_state: int = 0,
         nsamples_sts: int = None,
         skip_ids: list[int] = []
@@ -68,11 +70,13 @@ def compute_STS(
     
     """
 
-    assert(X.shape[0] == Y.shape[0])
-    nsamples = X.shape[0]
+    assert(X_train.shape[0] == Y_train.shape[0])
+    nsamples_train = X_train.shape[0]
+    nsamples_test = X_test.shape[0]
+    nsamples = nsamples_train + nsamples_test
 
-    assert(len(X.shape) == 2)
-    sample_length = X.shape[1]
+    assert(len(X_train.shape) == 2)
+    sample_length = X_train.shape[1]
 
     rng = np.random.default_rng(seed=random_state)
 
@@ -81,11 +85,22 @@ def compute_STS(
         STS_X = np.empty(nsamples*sample_length)
         STS_Y = np.empty(nsamples*sample_length)
 
-        for r, idx in enumerate(rng.permutation(np.arange(nsamples))):
+        # train samples
+        for r, idx in enumerate(rng.permutation(np.arange(nsamples_train))):
             
-            sample = X[idx,:].copy()
-            label = Y[idx]
+            sample = X_train[idx,:].copy()
+            label = Y_train[idx]
 
+            STS_X[r*sample_length:(r+1)*sample_length] = sample
+            STS_Y[r*sample_length:(r+1)*sample_length] = label
+        
+        # test samples
+        for r, idx in enumerate(rng.permutation(np.arange(nsamples_test))):
+            
+            sample = X_train[idx,:].copy()
+            label = Y_train[idx]
+            
+            r = r + nsamples_train
             STS_X[r*sample_length:(r+1)*sample_length] = sample
             STS_Y[r*sample_length:(r+1)*sample_length] = label
 
