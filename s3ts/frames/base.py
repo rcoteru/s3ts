@@ -19,7 +19,8 @@ class BaseDataset(Dataset):
             indexes: np.ndarray,
             window_size: int,
             transform = None, 
-            target_transform = None
+            target_transform = None,
+            continuous_labels = False,
             ) -> None:
 
         self.frames = frames
@@ -32,6 +33,7 @@ class BaseDataset(Dataset):
 
         self.transform = transform
         self.target_transform = target_transform
+        self.continuous_labels = continuous_labels
 
     def __len__(self) -> int:
         """ Return the number of samples in the dataset. """
@@ -42,7 +44,12 @@ class BaseDataset(Dataset):
         """ Return an entry (x, y) from the dataset. """
 
         idx = self.indexes[idx]
-        label = self.labels[idx,:]
+
+        if self.continuous_labels:
+            label = self.labels[idx,:].mean(axis=1)
+        else:
+            label = self.labels[idx,:]
+        
         frame = self.frames[:,:,idx - self.window_size:idx]
         
         if self.transform:

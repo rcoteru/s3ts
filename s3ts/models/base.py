@@ -63,7 +63,7 @@ class BasicModel(LightningModule):
             self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=n_labels, task="multiclass"))
             self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=n_labels, task="multiclass", average="micro"))
             if phase != "train":
-                self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=n_labels, task="multiclass", average="weighted"))
+                self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=n_labels, task="multiclass", average="macro"))
 
     # FORWARD
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
