@@ -1,3 +1,9 @@
+"""
+
+@author Raúl Coterillo
+@version 2023-01
+"""
+
 # data
 from s3ts.training.pretrain import pretrain_data_modules
 from s3ts.frames.tasks.download import download_dataset
@@ -26,7 +32,7 @@ DATASET = "GunPoint"
 PRETRAIN = 0
 ENCODER = CNN_Encoder
 
-RANDOM_STATE = 43
+RANDOM_STATE = 0
 seed_everything(RANDOM_STATE)
 
 # remove cache 
@@ -45,7 +51,7 @@ X, Y, mapping = download_dataset(DATASET)
 pretrain_dm, train_dm = pretrain_data_modules(
     X=X, Y=Y, 
     ulab_frac=0,
-    test_size=0.2, 
+    test_size=0.1,
     window_size=5,
     batch_size=128,
     rho_dfs=0.1,
