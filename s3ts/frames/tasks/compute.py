@@ -97,14 +97,14 @@ def compute_STS(
         # test samples
         for r, idx in enumerate(rng.permutation(np.arange(nsamples_test))):
             
-            sample = X_train[idx,:].copy()
-            label = Y_train[idx]
+            sample = X_test[idx,:].copy()
+            label = Y_test[idx]
             
             r = r + nsamples_train
             STS_X[r*sample_length:(r+1)*sample_length] = sample
             STS_Y[r*sample_length:(r+1)*sample_length] = label
 
-    else:
+    else: # TODO fix, broken
         STS_X = np.empty(nsamples_sts*sample_length)
         STS_Y = np.empty(nsamples_sts*sample_length)
 
@@ -119,6 +119,6 @@ def compute_STS(
             STS_X[r*sample_length:(r+1)*sample_length] = X[random_idx,:]
             STS_Y[r*sample_length:(r+1)*sample_length] = Y[random_idx]
 
-    return STS_X, STS_Y
+    return STS_X, STS_Y, nsamples_test/nsamples
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

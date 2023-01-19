@@ -9,7 +9,7 @@ from sklearn.preprocessing import KBinsDiscretizer
 from pathlib import Path
 import numpy as np
 
-def pretrain_data_modules(
+def prepare_data_modules(
         X: np.ndarray,
         Y: np.ndarray,
         ulab_frac: float,
@@ -18,12 +18,13 @@ def pretrain_data_modules(
         batch_size: int,
         rho_dfs: int,
         random_state: int = 0,
+        random_state_test: int = 0,
         cache_dir: Path = Path("cache")
         ) -> tuple[BaseDataModule, BaseDataModule]:
 
 
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, 
-            test_size=test_size, stratify=Y, random_state=random_state, shuffle=True)
+            test_size=test_size, stratify=Y, random_state=random_state_test, shuffle=True)
 
     if ulab_frac > 0:
 
@@ -38,7 +39,7 @@ def pretrain_data_modules(
         medoids, medoid_ids = compute_medoids(X_lab, Y_lab, distance_type="dtw")
 
         # generate STS
-        STS_lab, labels_lab = compute_STS(                     
+        STS_lab, labels_lab, test_ratio_lab = compute_STS(                     
             X_train=X_lab, Y_train=Y_lab,
             X_test=X_test, Y_test=Y_test)
 
@@ -56,13 +57,13 @@ def pretrain_data_modules(
             DFS=DFS_lab, 
             window_size=window_size, 
             batch_size=batch_size,
-            test_size=test_size)
+            test_size=test_ratio_lab)
 
         # UNLABELED DATASET (PRETRAIN) 
         # =================================
 
         # generate STS (discarding labels)
-        STS_ulab, _ = compute_STS(                     
+        STS_ulab, _, test_ratio_ulab = compute_STS(                     
             X_train=X_ulab, Y_train=Y_ulab,
             X_test=X_test, Y_test=Y_test)
 
@@ -85,7 +86,7 @@ def pretrain_data_modules(
             DFS=DFS_ulab, 
             window_size=window_size, 
             batch_size=batch_size,
-            test_size=test_size)
+            test_size=test_ratio_ulab)
 
         return pretrain_dm, train_dm
 
@@ -98,7 +99,7 @@ def pretrain_data_modules(
         medoids, medoid_ids = compute_medoids(X_train, Y_train, distance_type="dtw")
 
         # generate STS
-        STS_lab, labels_lab = compute_STS(                     
+        STS_lab, labels_lab, test_ratio = compute_STS(                     
             X_train=X_train, Y_train=Y_train,
             X_test=X_test, Y_test=Y_test)
 
@@ -116,6 +117,6 @@ def pretrain_data_modules(
             DFS=DFS_lab, 
             window_size=window_size, 
             batch_size=batch_size,
-            test_size=test_size)
+            test_size=test_ratio)
 
         return None, train_dm

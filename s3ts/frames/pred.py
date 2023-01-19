@@ -5,22 +5,21 @@ import torchvision as tv
 import torch
 
 import multiprocessing as mp
-
 import numpy as np
 
 # ================================================================= #
 
-class BaseDataset(Dataset):
+class PredDataset(Dataset):
 
     def __init__(self,
             frames: np.ndarray,
             series: np.ndarray,
             labels: np.ndarray,
             indexes: np.ndarray,
+            lab_shifts: list[int],
             window_size: int,
             transform = None, 
-            target_transform = None,
-            continuous_labels = False,
+            target_transform = None
             ) -> None:
 
         self.frames = frames
@@ -30,10 +29,10 @@ class BaseDataset(Dataset):
 
         self.n_samples = len(self.indexes)
         self.window_size = window_size
+        self.lab_shifts = lab_shifts
 
         self.transform = transform
         self.target_transform = target_transform
-        self.continuous_labels = continuous_labels
 
     def __len__(self) -> int:
         """ Return the number of samples in the dataset. """
@@ -44,12 +43,11 @@ class BaseDataset(Dataset):
         """ Return an entry (x, y) from the dataset. """
 
         idx = self.indexes[idx]
+        mask = np.zeros(len(self.series))
+        for s in self.lab_shifts:
+            mask[idx+s] = 1
 
-        if self.continuous_labels:
-            label = self.labels[idx,:].mean(axis=1)
-        else:
-            label = self.labels[idx,:]
-        
+        label = self.labels[mask]
         frame = self.frames[:,:,idx - self.window_size:idx]
         
         if self.transform:
@@ -61,7 +59,7 @@ class BaseDataset(Dataset):
 
 # ================================================================= #
 
-class BaseDataModule(LightningDataModule):
+class PredDataModule(LightningDataModule):
 
     def __init__(self,
             # calculate this outside
@@ -72,6 +70,7 @@ class BaseDataModule(LightningDataModule):
             window_size: int, 
             batch_size: int,
             test_size: float,
+            lab_shifts: list[int],
             random_state: int = 0,
             eval_size: float = 0.10,
             ) -> None:
@@ -93,17 +92,19 @@ class BaseDataModule(LightningDataModule):
         # datamodule settings
         self.batch_size = batch_size
         self.window_size = window_size
+        self.lab_shifts = np.array(lab_shifts, dtype=int)
         self.random_state = random_state 
         self.num_workers = mp.cpu_count()//2
 
         # generate train/eval/test indexes
         br0 = self.window_size*3
-        br1 = int(self.l_DFS*(1-test_size-eval_size)) + window_size
-        br2 = int(self.l_DFS*(1-test_size)) + window_size
+        br1 = int(self.l_DFS*(1-test_size-eval_size)) + max(window_size, np.max(lab_shifts))
+        br2 = int(self.l_DFS*(1-test_size)) + max(window_size, np.max(lab_shifts))
+        end = self.l_DFS - max(window_size, np.max(lab_shifts))
 
-        self.train_idx = np.arange(br0, br1) 
+        self.train_idx = np.arange(br0, br1)
         self.eval_idx = np.arange(br1, br2)
-        self.test_idx = np.arange(br2, self.l_DFS)
+        self.test_idx = np.arange(br2, end)
 
         print("Train samples:", len(self.train_idx))
         print("Eval samples:", len(self.eval_idx))
@@ -111,17 +112,17 @@ class BaseDataModule(LightningDataModule):
 
         # normalization_transform
         transform = tv.transforms.Normalize(
-                self.DFS[:,:,self.window_size*3:br1].mean(axis=[1,2]), 
-                self.DFS[:,:,self.window_size*3:br1].std(axis=[1,2]))
+                self.DFS[:,:,br0:br1].mean(axis=[1,2]),
+                self.DFS[:,:,br0:br1].std(axis=[1,2]))
 
         # training dataset
-        self.ds_train = BaseDataset(indexes=self.train_idx,
+        self.ds_train = PredDataset(indexes=self.train_idx, lab_shifts=lab_shifts,
             frames=self.DFS, series=self.STS, labels=self.labels, window_size=self.window_size, transform=transform)
 
-        self.ds_eval = BaseDataset(indexes=self.eval_idx,
+        self.ds_eval = PredDataset(indexes=self.eval_idx, lab_shifts=lab_shifts,
             frames=self.DFS, series=self.STS, labels=self.labels, window_size=self.window_size, transform=transform)
 
-        self.ds_test = BaseDataset(indexes=self.test_idx,
+        self.ds_test = PredDataset(indexes=self.test_idx, lab_shifts=lab_shifts,
             frames=self.DFS, series=self.STS, labels=self.labels, window_size=self.window_size, transform=transform)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

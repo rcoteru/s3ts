@@ -1,17 +1,20 @@
 """
+Kind obvious tbh.
 
 @author Raúl Coterillo
 @version 2023-01
 """
 
 # data
-from s3ts.training.pretrain import pretrain_data_modules
 from s3ts.frames.tasks.download import download_dataset
+from s3ts.setup.pred import prepare_data_modules
+from s3ts.frames.pred import PredDataModule
 from s3ts.frames.base import BaseDataModule
 
 # models
 from s3ts.models.encoders.ResNet import ResNet_Encoder
 from s3ts.models.encoders.CNN import CNN_Encoder
+from s3ts.models.pred import PredModel
 from s3ts.models.base import BasicModel
 
 # training
@@ -29,18 +32,20 @@ from pathlib import Path
 DIR = Path("test")
 
 DATASET = "GunPoint"
-PRETRAIN = 0
+PRETRAIN = 1
 ENCODER = CNN_Encoder
+LAB_SHIFTS = [0.1]
 
 RANDOM_STATE = 0
+RANDOM_STATE_TEST = 0
 seed_everything(RANDOM_STATE)
 
 # remove cache 
-rmtree(Path("cache"))
+rmtree(Path("cache"), ignore_errors=True)
+Path("cache").mkdir()
 
 # remove training files
-rmtree(DIR)
-
+rmtree(DIR, ignore_errors=True)
 
 # DATA
 # =================================
@@ -48,14 +53,15 @@ print("Loading data...")
 
 X, Y, mapping = download_dataset(DATASET)
 
-pretrain_dm, train_dm = pretrain_data_modules(
+pretrain_dm, train_dm = prepare_data_modules(
     X=X, Y=Y, 
-    ulab_frac=0,
+    ulab_frac=0.9,
     test_size=0.1,
     window_size=5,
     batch_size=128,
     rho_dfs=0.1,
-    random_state=RANDOM_STATE
+    random_state=RANDOM_STATE,
+    random_state_test=RANDOM_STATE_TEST,
 )
 
 # PRETRAIN
@@ -65,8 +71,8 @@ if PRETRAIN:
     print("Pretraining...")
 
     # create the model
-    pretrain_dm: BaseDataModule
-    pretrain_model = BasicModel(
+    pretrain_dm: PredDataModule
+    pretrain_model = PredModel(
             n_labels=pretrain_dm.n_labels, 
             n_patterns=pretrain_dm.n_patterns,
             l_patterns=pretrain_dm.l_patterns,
@@ -74,11 +80,11 @@ if PRETRAIN:
             arch=ENCODER)
     
     # create the trainer
-    checkpoint = ModelCheckpoint(monitor="val_acc", mode="max")               # save best model version
+    checkpoint = ModelCheckpoint(monitor="val_acc", mode="max")                 # save best model version
     trainer = Trainer(default_root_dir=DIR / "pretrain",  accelerator="auto",
         logger = TensorBoardLogger(save_dir= DIR / "pretrain", name="logs"),    # progress logs
         callbacks=[
-            EarlyStopping(monitor="val_acc", mode="max", patience=5),         # early stop the model
+            EarlyStopping(monitor="val_acc", mode="max", patience=5),           # early stop the model
             LearningRateMonitor(logging_interval='step'),                       # learning rate logger
             checkpoint],
         max_epochs=100,  deterministic = False,
@@ -88,7 +94,6 @@ if PRETRAIN:
 
     # load the best one and grab the encoder
     pretrain_model = pretrain_model.load_from_checkpoint(checkpoint.best_model_path)
-    #pretrain_model.load_from_checkpoint("test/pretrain/model.ckpt")
 
     trainer.validate(pretrain_model, datamodule=pretrain_dm)
     trainer.test(pretrain_model, datamodule=pretrain_dm)
@@ -118,7 +123,7 @@ trainer = Trainer(default_root_dir=DIR / "finetune",  accelerator="auto",
     logger = TensorBoardLogger(save_dir= DIR / "finetune", name="logs"),    
     callbacks=[
         # early stop the model
-        EarlyStopping(monitor="val_acc", mode="max", patience=20),         
+        EarlyStopping(monitor="val_acc", mode="max", patience=40),         
         # learning rate logger
         LearningRateMonitor(logging_interval='step'),  
         # save best model version                     
