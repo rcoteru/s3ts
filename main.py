@@ -14,6 +14,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning import Trainer, seed_everything
 
+from shutil import rmtree
 from pathlib import Path
 
 # SETTINGS
@@ -27,6 +28,13 @@ ENCODER = CNN_Encoder
 
 RANDOM_STATE = 43
 seed_everything(RANDOM_STATE)
+
+# remove cache 
+rmtree(Path("cache"))
+
+# remove training files
+rmtree(DIR)
+
 
 # DATA
 # =================================
