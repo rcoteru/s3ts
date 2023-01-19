@@ -1,8 +1,8 @@
 """
-Multitask Convolutional Classification Model
+Base Convolutional Classification Model
 
 @author Raúl Coterillo
-@version 2022-12
+@version 2023-01
 """
 
 from __future__ import annotations

@@ -21,28 +21,28 @@ def pretrain_data_modules(
         cache_dir: Path = Path("cache")
         ) -> tuple[BaseDataModule, BaseDataModule]:
 
+
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, 
+            test_size=test_size, stratify=Y, random_state=random_state, shuffle=True)
+
     if ulab_frac > 0:
 
         # divide en labeled y unlabeled
-        X_lab, X_ulab, Y_lab, Y_ulab = train_test_split(X, Y, 
-            test_size=ulab_frac, stratify=Y, random_state=random_state, shuffle=True)
+        X_lab, X_ulab, Y_lab, Y_ulab = train_test_split(X_train, Y_train, 
+            test_size=ulab_frac, stratify=Y_train, random_state=random_state, shuffle=True)
 
         # LABELED DATASET (TRAIN)
         # =================================
 
-        # labeled train test split
-        X_train, X_test, Y_train, Y_test = train_test_split(X_lab, Y_lab, 
-            test_size=test_size, stratify=Y_lab, random_state=random_state,  shuffle=True)
-
         # selecciona los patrones [n_patterns,  l_patterns]
-        medoids, medoid_ids = compute_medoids(X_train, Y_train, distance_type="dtw")
+        medoids, medoid_ids = compute_medoids(X_lab, Y_lab, distance_type="dtw")
 
         # generate STS
         STS_lab, labels_lab = compute_STS(                     
-            X_train=X_train, Y_train=Y_train,
+            X_train=X_lab, Y_train=Y_lab,
             X_test=X_test, Y_test=Y_test)
 
-        file_lab = "cache/lab.npy"
+        file_lab = cache_dir / "lab.npy"
         if not Path(file_lab).exists(): 
             DFS_lab = compute_OESM(STS_lab, medoids, rho=rho_dfs)   # generate DFS
             np.save(file_lab, DFS_lab)
@@ -61,16 +61,12 @@ def pretrain_data_modules(
         # UNLABELED DATASET (PRETRAIN) 
         # =================================
 
-        # unlabeled train test split
-        X_train, X_test, Y_train, Y_test = train_test_split(X_ulab, Y_ulab, 
-            test_size=test_size, stratify=Y_ulab, random_state=random_state, shuffle=True)
-
         # generate STS (discarding labels)
         STS_ulab, _ = compute_STS(                     
-            X_train=X_train, Y_train=Y_train,
+            X_train=X_ulab, Y_train=Y_ulab,
             X_test=X_test, Y_test=Y_test)
 
-        file_ulab = "cache/ulab.npy"
+        file_ulab = cache_dir / "ulab.npy"
         if not Path(file_ulab).exists(): 
             DFS_ulab = compute_OESM(STS_ulab, medoids, rho=rho_dfs)  # generate DFS
             np.save(file_ulab, DFS_ulab)
@@ -98,10 +94,6 @@ def pretrain_data_modules(
         # LABELED DATASET (TRAIN)
         # =================================
 
-        # labeled train test split
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, 
-            test_size=test_size, stratify=Y, random_state=random_state,  shuffle=True)
-
         # selecciona los patrones [n_patterns,  l_patterns]
         medoids, medoid_ids = compute_medoids(X_train, Y_train, distance_type="dtw")
 
@@ -110,7 +102,7 @@ def pretrain_data_modules(
             X_train=X_train, Y_train=Y_train,
             X_test=X_test, Y_test=Y_test)
 
-        file_lab = "cache/lab.npy"
+        file_lab = cache_dir / "lab.npy"
         if not Path(file_lab).exists(): 
             DFS_lab = compute_OESM(STS_lab, medoids, rho=rho_dfs)   # generate DFS
             np.save(file_lab, DFS_lab)
