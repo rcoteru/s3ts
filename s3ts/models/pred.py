@@ -43,6 +43,7 @@ class PredModel(LightningModule):
         self.save_hyperparameters()
 
         self.n_labels = n_labels
+        self.n_shifts = len(lab_shifts)
         self.n_patterns = n_patterns
         self.l_patterns = l_patterns
         self.window_size = window_size
@@ -57,12 +58,19 @@ class PredModel(LightningModule):
         # decoder
         self.decoder = nn.Sequential(
             nn.Linear(in_features=self.encoder.get_output_shape(), 
-            out_features=n_labels*len(lab_shifts)), nn.Softmax())
+            out_features=n_labels*self.n_shifts), nn.Softmax())
 
         # configure loggers
-        for phase in ["train", "val", "test"]:
-            self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=n_labels, task="multilabel"))
-            self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=n_labels, task="multilabel", average="micro"))
+        if self.n_shifts == 1:
+            for phase in ["train", "val", "test"]:
+                self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=n_labels, task="multiclass"))
+                self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=n_labels, task="multiclass", average="micro"))
+        elif self.n_shifts >= 2:
+            for phase in ["train", "val", "test"]:
+                self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=n_labels, num_labels=self.n_shifts, task="multilabel"))
+                self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=n_labels, num_labels=self.n_shifts, task="multilabel", average="micro"))
+        else:
+            raise RuntimeError("Need at least one value in label_shifts.")
 
     # FORWARD
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -71,8 +79,9 @@ class PredModel(LightningModule):
 
         """ Use for inference only (separate from training_step)"""
 
-        linear = self.decoder(self.encoder(frame))
-        out = torch.stack(torch.split(linear, self.n_labels))
+        out = self.decoder(self.encoder(frame))
+        if self.n_shifts > 1:
+            out = torch.stack(torch.split(out, self.n_labels, dim=1)).permute(1,0,2)
         return out
 
     # STEPS
@@ -96,8 +105,12 @@ class PredModel(LightningModule):
         loss = F.cross_entropy(output, y.to(torch.float32))
 
         # accumulate and return metrics for logging
-        acc = self.__getattr__(f"{stage}_acc")(output, torch.argmax(y, dim=1))
-        f1  = self.__getattr__(f"{stage}_f1")(output, torch.argmax(y, dim=1))
+        if self.n_shifts > 1:
+            acc = self.__getattr__(f"{stage}_acc")(output, y.to(torch.float32))
+            f1  = self.__getattr__(f"{stage}_f1")(output, y.to(torch.float32))
+        else:
+            acc = self.__getattr__(f"{stage}_acc")(output, torch.argmax(y, dim=1))
+            f1  = self.__getattr__(f"{stage}_f1")(output, torch.argmax(y, dim=1))
         
         if stage == "train":
             self.log(f"{stage}_loss", loss, sync_dist=True)

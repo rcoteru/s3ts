@@ -34,15 +34,15 @@ DIR = Path("test")
 DATASET = "GunPoint"
 PRETRAIN = 1
 ENCODER = CNN_Encoder
-LAB_SHIFTS = [0.1]
+LAB_SHIFTS = [0]
 
 RANDOM_STATE = 0
 RANDOM_STATE_TEST = 0
 seed_everything(RANDOM_STATE)
 
 # remove cache 
-rmtree(Path("cache"), ignore_errors=True)
-Path("cache").mkdir()
+# rmtree(Path("cache"), ignore_errors=True)
+# Path("cache").mkdir()
 
 # remove training files
 rmtree(DIR, ignore_errors=True)
@@ -60,6 +60,7 @@ pretrain_dm, train_dm = prepare_data_modules(
     window_size=5,
     batch_size=128,
     rho_dfs=0.1,
+    lab_shifts=LAB_SHIFTS,
     random_state=RANDOM_STATE,
     random_state_test=RANDOM_STATE_TEST,
 )
@@ -77,14 +78,15 @@ if PRETRAIN:
             n_patterns=pretrain_dm.n_patterns,
             l_patterns=pretrain_dm.l_patterns,
             window_size=pretrain_dm.window_size,
+            lab_shifts=pretrain_dm.lab_shifts,
             arch=ENCODER)
     
     # create the trainer
-    checkpoint = ModelCheckpoint(monitor="val_acc", mode="max")                 # save best model version
+    checkpoint = ModelCheckpoint(monitor="val_f1", mode="max")                 # save best model version
     trainer = Trainer(default_root_dir=DIR / "pretrain",  accelerator="auto",
         logger = TensorBoardLogger(save_dir= DIR / "pretrain", name="logs"),    # progress logs
         callbacks=[
-            EarlyStopping(monitor="val_acc", mode="max", patience=5),           # early stop the model
+            EarlyStopping(monitor="val_f1", mode="max", patience=5),           # early stop the model
             LearningRateMonitor(logging_interval='step'),                       # learning rate logger
             checkpoint],
         max_epochs=100,  deterministic = False,
@@ -98,7 +100,7 @@ if PRETRAIN:
     trainer.validate(pretrain_model, datamodule=pretrain_dm)
     trainer.test(pretrain_model, datamodule=pretrain_dm)
 
-    pretrain_encoder = pretrain_model.encoder 
+    pretrain_encoder = pretrain_model.encoder
 
 # TRAIN
 # =================================

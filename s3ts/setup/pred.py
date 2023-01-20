@@ -34,6 +34,7 @@ def prepare_data_modules(
 
         # LABELED DATASET (TRAIN)
         # =================================
+        print("Creating train dataset...")
 
         # selecciona los patrones [n_patterns,  l_patterns]
         medoids, medoid_ids = compute_medoids(X_lab, Y_lab, distance_type="dtw")
@@ -60,6 +61,7 @@ def prepare_data_modules(
 
         # UNLABELED DATASET (PRETRAIN) 
         # =================================
+        print("Creating pretrain dataset...")
 
         # generate STS (discarding labels)
         STS_ulab, _, test_ratio_ulab = compute_STS(                     
@@ -79,7 +81,7 @@ def prepare_data_modules(
         labels_ulab = kbd.transform(STS_ulab.reshape(-1,1)).squeeze().astype(int)
 
         l_sample = X.shape[1]
-        lab_shifts = np.round(lab_shifts*l_sample)
+        lab_shifts = np.round(np.array(lab_shifts)*l_sample).astype(int)
         print("Label shifts:", lab_shifts)
 
         # create data module (pretrain)

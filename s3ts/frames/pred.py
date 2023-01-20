@@ -27,6 +27,7 @@ class PredDataset(Dataset):
         self.labels = labels
         self.indexes = indexes
 
+        self.n_shifts = len(lab_shifts)
         self.n_samples = len(self.indexes)
         self.window_size = window_size
         self.lab_shifts = lab_shifts
@@ -43,11 +44,15 @@ class PredDataset(Dataset):
         """ Return an entry (x, y) from the dataset. """
 
         idx = self.indexes[idx]
-        mask = np.zeros(len(self.series))
-        for s in self.lab_shifts:
-            mask[idx+s] = 1
+        
+        if self.n_shifts > 1:
+            label = []
+            for s in self.lab_shifts:
+                label.append(self.labels[idx+s,:])
+            label = torch.stack(label)
+        else:
+            label = self.labels[idx+self.lab_shifts[0],:]
 
-        label = self.labels[mask]
         frame = self.frames[:,:,idx - self.window_size:idx]
         
         if self.transform:
