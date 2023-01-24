@@ -3,10 +3,10 @@ from sktime.clustering.k_medoids import TimeSeriesKMedoids
 
 # numpy / scipy
 from scipy.spatial import distance_matrix
+from math import ceil
 import numpy as np
-
-from s3ts.structures import AugProbabilities
 import logging
+
 
 log = logging.Logger(__name__)
 
@@ -53,6 +53,51 @@ def compute_medoids(
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def compute_STS(
+        X: np.ndarray, 
+        Y: np.ndarray,
+        target_nframes: int,
+        frame_buffer: int = 0,
+        random_state: int = 0,
+        ) -> tuple[np.ndarray, np.ndarray]:
+
+    """
+    Builds an STS from and array of samples and labels.
+    """
+
+    assert(len(X.shape) == 2)
+    assert(X.shape[0] == Y.shape[0])
+    rng = np.random.default_rng(seed=random_state)
+    
+    nsamples = X.shape[0]
+    l_sample = X.shape[1]
+    
+    # recommended number of frames
+    rec_nframes = nsamples*l_sample
+
+    print("Sample size:", target_nframes)
+    print("Number of samples:", nsamples)
+    print("Target number of frames:", target_nframes)
+    print("Recom. number of frames:", rec_nframes)
+
+    if target_nframes < rec_nframes:
+        print(f"WARNING: Target number of frames {target_nframes} below"
+                f"recommended {rec_nframes} for {nsamples} of size {l_sample}")
+
+    target_nsamples = ceil((target_nframes + frame_buffer)/float(l_sample))
+
+    STS_X = np.empty(target_nsamples*l_sample)
+    STS_Y = np.empty(target_nsamples*l_sample)
+
+    for r in range(target_nsamples):
+        random_idx = rng.integers(0, nsamples)
+        STS_X[r*l_sample:(r+1)*l_sample] = X[random_idx,:]
+        STS_Y[r*l_sample:(r+1)*l_sample] = Y[random_idx]
+        
+    return STS_X, STS_Y
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+def compute_STS_old(
         X_train: np.ndarray, 
         Y_train: np.ndarray, 
         X_test: np.ndarray,
@@ -120,5 +165,3 @@ def compute_STS(
             STS_Y[r*sample_length:(r+1)*sample_length] = Y[random_idx]
 
     return STS_X, STS_Y, nsamples_test/nsamples
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

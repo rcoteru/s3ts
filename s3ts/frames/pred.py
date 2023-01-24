@@ -68,47 +68,58 @@ class PredDataModule(LightningDataModule):
 
     def __init__(self,
             # calculate this outside
-            STS: np.ndarray,
-            DFS: np.ndarray,
-            labels: np.ndarray,
+            STS_train: np.ndarray,
+            DFS_train: np.ndarray,
+            labels_train: np.ndarray,
             # ~~~~~~~~~~~~~~~~~~~~~~
             window_size: int, 
             batch_size: int,
-            test_size: float,
             lab_shifts: list[int],
+            val_size: float = 0.1,
+            frame_buffer: int = 0,
             random_state: int = 0,
-            eval_size: float = 0.10,
+            # ~~~~~~~~~~~~~~~~~~~~~~
+            STS_test: np.ndarray = None,
+            DFS_test: np.ndarray = None,
+            labels_test: np.ndarray = None,
             ) -> None:
         
         super().__init__()
 
         # convert dataset to tensors
-        self.STS = torch.from_numpy(STS).to(torch.float32)
-        self.DFS = torch.from_numpy(DFS).to(torch.float32)
-        self.labels = torch.from_numpy(labels).to(torch.int64)
-        self.labels = torch.nn.functional.one_hot(self.labels)
+        self.STS_train = torch.from_numpy(STS_train).to(torch.float32)
+        self.DFS_train = torch.from_numpy(DFS_train).to(torch.float32)
+        self.labels_train = torch.from_numpy(labels_train).to(torch.int64)
+        self.labels_train = torch.nn.functional.one_hot(self.labels)
 
         # get dataset info
-        self.n_labels = len(np.unique(labels))
-        self.n_patterns = DFS.shape[0]
-        self.l_patterns = DFS.shape[1]
-        self.l_DFS = DFS.shape[2]
+        self.n_labels = len(np.unique(labels_train))
+        self.n_patterns = DFS_train.shape[0]
+        self.l_patterns = DFS_train.shape[1]
+        self.l_DFS_train = DFS_train.shape[2]
 
         # datamodule settings
         self.batch_size = batch_size
         self.window_size = window_size
         self.lab_shifts = np.array(lab_shifts, dtype=int)
         self.random_state = random_state 
-        self.num_workers = mp.cpu_count()//2
+        self.num_workers = mp.cpu_count()//2        
+
+        self.test = self.STS_test is not None
+        if self.test:
+            self.STS_test = torch.from_numpy(STS_test).to(torch.float32)
+            self.DFS_test = torch.from_numpy(DFS_test).to(torch.float32)
+            self.labels_test = torch.from_numpy(labels_test).to(torch.int64)
+            self.labels_test = torch.nn.functional.one_hot(self.labels)
+            self.l_DFS_train = DFS_train.shape[2]
 
         # generate train/eval/test indexes
-        br0 = self.window_size*3
-        br1 = int(self.l_DFS*(1-test_size-eval_size)) + max(window_size, np.max(lab_shifts))
-        br2 = int(self.l_DFS*(1-test_size)) + max(window_size, np.max(lab_shifts))
-        end = self.l_DFS - max(window_size, np.max(lab_shifts))
 
         self.train_idx = np.arange(br0, br1)
         self.eval_idx = np.arange(br1, br2)
+        
+        
+        
         self.test_idx = np.arange(br2, end)
 
         print("Train samples:", len(self.train_idx))
@@ -117,18 +128,24 @@ class PredDataModule(LightningDataModule):
 
         # normalization_transform
         transform = tv.transforms.Normalize(
-                self.DFS[:,:,br0:br1].mean(axis=[1,2]),
-                self.DFS[:,:,br0:br1].std(axis=[1,2]))
+                self.DFS_train.mean(axis=[1,2]),
+                self.DFS_train.std(axis=[1,2]))
 
         # training dataset
-        self.ds_train = PredDataset(indexes=self.train_idx, lab_shifts=lab_shifts,
-            frames=self.DFS, series=self.STS, labels=self.labels, window_size=self.window_size, transform=transform)
+        self.ds_train = PredDataset(
+            indexes=self.train_idx, lab_shifts=lab_shifts,
+            frames=self.DFS, series=self.STS, labels=self.labels,
+             window_size=self.window_size, transform=transform)
 
-        self.ds_eval = PredDataset(indexes=self.eval_idx, lab_shifts=lab_shifts,
-            frames=self.DFS, series=self.STS, labels=self.labels, window_size=self.window_size, transform=transform)
+        self.ds_eval = PredDataset(
+            indexes=self.eval_idx, lab_shifts=lab_shifts,
+            frames=self.DFS, series=self.STS, labels=self.labels, 
+            window_size=self.window_size, transform=transform)
 
-        self.ds_test = PredDataset(indexes=self.test_idx, lab_shifts=lab_shifts,
-            frames=self.DFS, series=self.STS, labels=self.labels, window_size=self.window_size, transform=transform)
+        self.ds_test = PredDataset(
+            indexes=self.test_idx, lab_shifts=lab_shifts,
+            frames=self.DFS, series=self.STS, labels=self.labels, 
+            window_size=self.window_size, transform=transform)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
@@ -148,12 +165,16 @@ class PredDataModule(LightningDataModule):
 
     def test_dataloader(self):
         """ Returns the test DataLoader. """
-        return DataLoader(self.ds_test, batch_size=self.batch_size, 
-            num_workers=self.num_workers, shuffle=False)
+        if self.test:
+            return DataLoader(self.ds_test, batch_size=self.batch_size, 
+                num_workers=self.num_workers, shuffle=False)
+        return None
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
     def predict_dataloader(self):
         """ Returns the pred DataLoader. (test) """
-        return DataLoader(self.ds_test, batch_size=self.batch_size, 
-            num_workers=self.num_workers, shuffle=False)
+        if self.test:
+            return DataLoader(self.ds_test, batch_size=self.batch_size, 
+                num_workers=self.num_workers, shuffle=False)
+        return None

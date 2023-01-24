@@ -6,7 +6,7 @@ Kind obvious tbh.
 """
 
 # data
-from s3ts.frames.tasks.download import download_dataset
+
 from s3ts.setup.pred import prepare_data_modules
 from s3ts.frames.pred import PredDataModule
 from s3ts.frames.base import BaseDataModule
@@ -51,18 +51,11 @@ rmtree(DIR, ignore_errors=True)
 # =================================
 print("Loading data...")
 
-X, Y, mapping = download_dataset(DATASET)
-
 pretrain_dm, train_dm = prepare_data_modules(
-    X=X, Y=Y, 
-    ulab_frac=0.9,
-    test_size=0.1,
+    dataset=DATASET, 
     window_size=5,
     batch_size=128,
     rho_dfs=0.1,
-    lab_shifts=LAB_SHIFTS,
-    random_state=RANDOM_STATE,
-    random_state_test=RANDOM_STATE_TEST,
 )
 
 # PRETRAIN
