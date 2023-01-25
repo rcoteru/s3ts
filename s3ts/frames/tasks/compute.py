@@ -80,8 +80,8 @@ def compute_STS(
     print("Recom. number of frames:", rec_nframes)
 
     if target_nframes < rec_nframes:
-        print(f"WARNING: Target number of frames {target_nframes} below"
-                f"recommended {rec_nframes} for {nsamples} of size {l_sample}")
+        print(f"WARNING: Target number of frames {target_nframes} below\n"
+              f"         recommended {rec_nframes} for {nsamples} samples of size {l_sample}")
 
     target_nsamples = ceil((target_nframes + frame_buffer)/float(l_sample))
 

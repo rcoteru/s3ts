@@ -71,17 +71,17 @@ class PredDataModule(LightningDataModule):
             STS_train: np.ndarray,
             DFS_train: np.ndarray,
             labels_train: np.ndarray,
+            nframes_train: int, 
             # ~~~~~~~~~~~~~~~~~~~~~~
             window_size: int, 
             batch_size: int,
             lab_shifts: list[int],
-            val_size: float = 0.1,
-            frame_buffer: int = 0,
             random_state: int = 0,
             # ~~~~~~~~~~~~~~~~~~~~~~
             STS_test: np.ndarray = None,
             DFS_test: np.ndarray = None,
             labels_test: np.ndarray = None,
+            nframes_test: int = None,
             ) -> None:
         
         super().__init__()
@@ -90,7 +90,7 @@ class PredDataModule(LightningDataModule):
         self.STS_train = torch.from_numpy(STS_train).to(torch.float32)
         self.DFS_train = torch.from_numpy(DFS_train).to(torch.float32)
         self.labels_train = torch.from_numpy(labels_train).to(torch.int64)
-        self.labels_train = torch.nn.functional.one_hot(self.labels)
+        self.labels_train = torch.nn.functional.one_hot(self.labels_train)
 
         # get dataset info
         self.n_labels = len(np.unique(labels_train))
@@ -101,30 +101,16 @@ class PredDataModule(LightningDataModule):
         # datamodule settings
         self.batch_size = batch_size
         self.window_size = window_size
+        self.frame_buffer = 3*window_size
         self.lab_shifts = np.array(lab_shifts, dtype=int)
         self.random_state = random_state 
         self.num_workers = mp.cpu_count()//2        
 
-        self.test = self.STS_test is not None
-        if self.test:
-            self.STS_test = torch.from_numpy(STS_test).to(torch.float32)
-            self.DFS_test = torch.from_numpy(DFS_test).to(torch.float32)
-            self.labels_test = torch.from_numpy(labels_test).to(torch.int64)
-            self.labels_test = torch.nn.functional.one_hot(self.labels)
-            self.l_DFS_train = DFS_train.shape[2]
-
-        # generate train/eval/test indexes
-
-        self.train_idx = np.arange(br0, br1)
-        self.eval_idx = np.arange(br1, br2)
-        
-        
-        
-        self.test_idx = np.arange(br2, end)
-
+        train_stop = int(nframes_train*2./3.)
+        self.train_idx = np.arange(self.frame_buffer, self.frame_buffer+train_stop)
+        self.valid_idx = np.arange(self.frame_buffer+train_stop, self.l_DFS_train-np.max(lab_shifts))
         print("Train samples:", len(self.train_idx))
-        print("Eval samples:", len(self.eval_idx))
-        print("Test samples:", len(self.test_idx))
+        print("Valid samples:", len(self.valid_idx))
 
         # normalization_transform
         transform = tv.transforms.Normalize(
@@ -134,18 +120,30 @@ class PredDataModule(LightningDataModule):
         # training dataset
         self.ds_train = PredDataset(
             indexes=self.train_idx, lab_shifts=lab_shifts,
-            frames=self.DFS, series=self.STS, labels=self.labels,
-             window_size=self.window_size, transform=transform)
+            frames=self.DFS_train, series=self.STS_train, labels=self.labels_train,
+            window_size=self.window_size, transform=transform)
 
+        # validation dataset
         self.ds_eval = PredDataset(
-            indexes=self.eval_idx, lab_shifts=lab_shifts,
-            frames=self.DFS, series=self.STS, labels=self.labels, 
+            indexes=self.valid_idx, lab_shifts=lab_shifts,
+            frames=self.DFS_train, series=self.STS_train, labels=self.labels_train, 
             window_size=self.window_size, transform=transform)
 
-        self.ds_test = PredDataset(
-            indexes=self.test_idx, lab_shifts=lab_shifts,
-            frames=self.DFS, series=self.STS, labels=self.labels, 
-            window_size=self.window_size, transform=transform)
+        # repeat for testing if needed
+        self.test = STS_test is not None
+        if self.test:
+            self.STS_test = torch.from_numpy(STS_test).to(torch.float32)
+            self.DFS_test = torch.from_numpy(DFS_test).to(torch.float32)
+            self.labels_test = torch.from_numpy(labels_test).to(torch.int64)
+            self.labels_test = torch.nn.functional.one_hot(self.labels_test)
+            self.l_DFS_test = DFS_test.shape[2]
+            self.test_idx = np.arange(self.frame_buffer, nframes_test-np.max(lab_shifts))
+            print("Test samples:", len(self.test_idx))
+
+            self.ds_test = PredDataset(
+                indexes=self.test_idx, lab_shifts=lab_shifts,
+                frames=self.DFS_test, series=self.STS_test, labels=self.labels_test, 
+                window_size=self.window_size, transform=transform)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 

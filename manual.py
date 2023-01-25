@@ -40,10 +40,6 @@ RANDOM_STATE = 0
 RANDOM_STATE_TEST = 0
 seed_everything(RANDOM_STATE)
 
-# remove cache 
-# rmtree(Path("cache"), ignore_errors=True)
-# Path("cache").mkdir()
-
 # remove training files
 rmtree(DIR, ignore_errors=True)
 
@@ -51,11 +47,25 @@ rmtree(DIR, ignore_errors=True)
 # =================================
 print("Loading data...")
 
-pretrain_dm, train_dm = prepare_data_modules(
-    dataset=DATASET, 
-    window_size=5,
+train_dm, pretrain_dm = prepare_data_modules(
+    dataset=DATASET,
+    # these can be changed without recalculating anything
     batch_size=128,
-    rho_dfs=0.1,
+    window_size=5,
+    lab_shifts=LAB_SHIFTS,
+    # these are needed for frame creation and imply recalcs
+    rho_dfs = 0.1,
+    pret_frac = 0.8,
+    test_frac = 0.2,
+    # ~~~~~~~~~~~~~~~~
+    nframes_tra = 2000, 
+    nframes_pre = 2000,
+    nframes_test = 2000,
+    # ~~~~~~~~~~~~~~~~
+    seed_sts=0,
+    seed_label=0,
+    seed_test=0,
+    # ~~~~~~~~~~~~~~~~
 )
 
 # PRETRAIN
@@ -82,7 +92,7 @@ if PRETRAIN:
             EarlyStopping(monitor="val_f1", mode="max", patience=5),           # early stop the model
             LearningRateMonitor(logging_interval='step'),                       # learning rate logger
             checkpoint],
-        max_epochs=100,  deterministic = False,
+        max_epochs=5,  deterministic = False,
         log_every_n_steps=1, check_val_every_n_epoch=1)
 
     trainer.fit(pretrain_model, datamodule=pretrain_dm)
@@ -92,6 +102,9 @@ if PRETRAIN:
 
     trainer.validate(pretrain_model, datamodule=pretrain_dm)
     trainer.test(pretrain_model, datamodule=pretrain_dm)
+
+    # x = trainer.validate(pretrain_model, datamodule=pretrain_dm)
+    # x[0]['val_acc'], x[0]['val_f1']
 
     pretrain_encoder = pretrain_model.encoder
 
