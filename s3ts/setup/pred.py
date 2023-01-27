@@ -31,6 +31,10 @@ import numpy as np
 
 def prepare_data_modules(
         dataset: str,
+        X_train: np.ndarray, 
+        X_test: np.ndarray, 
+        Y_train: np.ndarray, 
+        Y_test: np.ndarray,
         # these can be changed without recalculating anything
         batch_size: int,
         window_size: int,
@@ -46,22 +50,14 @@ def prepare_data_modules(
         # ~~~~~~~~~~~~~~~~
         seed_sts: int = 0,
         seed_label: int = 0,
-        seed_test: int = 0,
+        fold_number: int = 0,
         # ~~~~~~~~~~~~~~~~
         cache_dir: Path = Path("cache")
         ) -> tuple[PredDataModule, PredDataModule]:
 
     """ Prepares the data modules. """
 
-    print(f"Downloading dataset {dataset}...")
-    X, Y, mapping = download_dataset(dataset)
-
     # set splitting ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # división entre train y test
-    print(f"Splitting training and test sets (seed: {seed_test})")
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, 
-            test_size=test_frac, stratify=Y, random_state=seed_test, shuffle=True)
 
     # divide en labeled y unlabeled
     print(f"Splitting train and pretrain sets (seed: {seed_label})")
@@ -94,7 +90,7 @@ def prepare_data_modules(
     # DFS generation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     fracs = f"{test_frac}-{pret_frac}"
-    seeds = f"{seed_test}-{seed_label}-{seed_sts}"
+    seeds = f"{fold_number}-{seed_label}-{seed_sts}"
     frames = f"{nframes_tra}-{nframes_pre}-{nframes_test}"
     cache_file = cache_dir / f"DFS_{dataset}_{fracs}_{seeds}_{frames}.npz"
 
@@ -123,7 +119,7 @@ def prepare_data_modules(
 
     print("Creating 'pretrain' dataset...")
 
-    l_sample = X.shape[1]
+    l_sample = X_train.shape[1]
     lab_shifts = np.round(np.array(lab_shifts)*l_sample).astype(int)
     print("Label shifts:", lab_shifts)    
 
@@ -167,6 +163,11 @@ def setup_trainer(
 
 def compare_pretrain(
     dataset: str,
+    X_train: np.ndarray, 
+    X_test: np.ndarray, 
+    Y_train: np.ndarray, 
+    Y_test: np.ndarray,
+    directory: Path,
     arch: type[LightningModule],
     # ~~~~~~~~~~~~~~~~
     batch_size: int,
@@ -176,7 +177,6 @@ def compare_pretrain(
     # therse are needed for frame creation and imply recalcs
     rho_dfs: float,
     pret_frac: float,
-    test_frac: float,
     # ~~~~~~~~~~~~~~~~
     nframes_tra: int, 
     nframes_pre: int,
@@ -191,23 +191,23 @@ def compare_pretrain(
     # ~~~~~~~~~~~~~~~~
     seed_sts: int = 0,
     seed_label: int = 0,
-    seed_test: int = 0,
-    seed_torch: int = 0
+    seed_torch: int = 0,
+    fold_number: int = 0,
     ) -> pd.Series:
 
     seed_everything(seed_torch)
 
     results = pd.Series()
-    results["dataset"], results["decoder"] = dataset, str(type(LightningModule))
+    results["dataset"], results["fold_number"], results["decoder"] = dataset, fold_number, str(type(LightningModule))
     results["batch_size"], results["window_size"], results["lab_shifts"] = batch_size, window_size, lab_shifts
     results["nframes_tra"], results["nframes_pre"],results["nframes_test"] = nframes_tra, nframes_pre, nframes_test
-    results["seed_sts"], results["seed_label"], results["seed_test"] = seed_sts, seed_label, seed_test 
+    results["seed_sts"], results["seed_label"], results["seed_test"] = seed_sts, seed_label
 
     train_dm, pretrain_dm = prepare_data_modules(dataset=dataset,
         batch_size=batch_size, window_size=window_size, lab_shifts=lab_shifts,
-        rho_dfs=rho_dfs, pret_frac=pret_frac, test_frac=test_frac,
+        rho_dfs=rho_dfs, pret_frac=pret_frac, fold_number=fold_number,
         nframes_tra=nframes_tra, nframes_pre=nframes_pre, nframes_test=nframes_test,
-        seed_sts=seed_sts, seed_label=seed_label, seed_test=seed_test)
+        seed_sts=seed_sts, seed_label=seed_label, fold_number=fold_number)
 
     train_dm: PredDataModule
     pretrain_dm: PredDataModule
@@ -223,7 +223,8 @@ def compare_pretrain(
             arch=arch) 
 
     # train the model
-    trainer, checkpoint = setup_trainer()
+    trainer, checkpoint = setup_trainer(directory=directory,  version="default",
+        epoch_max=tra_maxepoch, epoch_patience=tra_patience, stop_metric=stop_metric)
     trainer.fit(train_model, datamodule=train_dm)
     train_model = train_model.load_from_checkpoint(checkpoint.best_model_path)
 
@@ -250,7 +251,8 @@ def compare_pretrain(
             lab_shifts=pretrain_dm.lab_shifts,
             arch=arch)
                
-    trainer, checkpoint = setup_trainer()
+    trainer, checkpoint = setup_trainer(directory=directory,  version="aux",
+        epoch_max=pre_maxepoch, epoch_patience=pre_patience, stop_metric=stop_metric)
     trainer.fit(train_model, datamodule=train_dm)
     pretrain_model = pretrain_model.load_from_checkpoint(checkpoint.best_model_path)
     valid_results = trainer.validate(train_model, datamodule=train_dm)
@@ -271,10 +273,8 @@ def compare_pretrain(
             window_size=train_dm.window_size,
             arch=arch) 
     train_model.encoder = pretrained_encoder
-
-    trainer, checkpoint = setup_trainer(
-        ...
-    )
+    trainer, checkpoint = setup_trainer(directory=directory,  version="pretrain",
+        epoch_max=tra_maxepoch, epoch_patience=tra_patience, stop_metric=stop_metric)
     trainer.fit(train_model, datamodule=train_dm)
     train_model = train_model.load_from_checkpoint(checkpoint.best_model_path)
     valid_results = trainer.validate(train_model, datamodule=train_dm)
@@ -288,3 +288,5 @@ def compare_pretrain(
     results["pretrain_test_acc"] = test_results[0]["test_acc"]
     results["pretrain_test_f1"] = test_results[0]["test_f1"]
     results["pretrain_test_auroc"] = test_results[0]["test_auroc"]
+
+    return results.to_frame().transpose().copy()
