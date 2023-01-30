@@ -8,7 +8,7 @@ Kind obvious tbh.
 # data
 from s3ts.frames.tasks.download import download_dataset
 from s3ts.setup.base import prepare_data_modules
-from s3ts.frames.pred import PredDataModule
+from s3ts.frames.modules import PredDataModule
 from s3ts.frames.base import BaseDataModule
 
 # models
