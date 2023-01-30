@@ -2,16 +2,13 @@
 
 # data processing stuff
 from s3ts.frames.tasks.compute import compute_medoids, compute_STS
-from s3ts.frames.tasks.download import download_dataset
 from s3ts.frames.tasks.oesm import compute_OESM
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer
 
-# data modules
-from sklearn.model_selection import train_test_split
-from s3ts.frames.pred import PredDataModule
-
-# models
+# models / modules
 from pytorch_lightning import LightningModule
+from s3ts.frames.pred import PredDataModule
 from s3ts.models.pred import PredModel
 
 # training stuff
@@ -39,6 +36,7 @@ def prepare_data_modules(
         batch_size: int,
         window_size: int,
         lab_shifts: list[int],
+        pre_intervals: int,
         # therse are needed for frame creation and imply recalcs
         rho_dfs: float,
         pret_frac: float,
@@ -78,7 +76,7 @@ def prepare_data_modules(
     print("Generating 'pretrain' STS...")
     STS_pre, _, = compute_STS(X=X_pre, Y=Y_pre, target_nframes=nframes_pre, 
         frame_buffer=window_size*3,random_state=seed_sts)
-    kbd = KBinsDiscretizer(n_bins=5, encode="ordinal", strategy="quantile", random_state=seed_sts)
+    kbd = KBinsDiscretizer(n_bins=pre_intervals, encode="ordinal", strategy="quantile", random_state=seed_sts)
     kbd.fit(STS_pre.reshape(-1,1))
     labels_pre = kbd.transform(STS_pre.reshape(-1,1)).squeeze().astype(int)
     
@@ -171,6 +169,7 @@ def compare_pretrain(
     # ~~~~~~~~~~~~~~~~
     batch_size: int,
     window_size: int,
+    pre_intervals: int,
     lab_shifts: list[int],
     # ~~~~~~~~~~~~~~~~
     # therse are needed for frame creation and imply recalcs
@@ -207,7 +206,7 @@ def compare_pretrain(
         batch_size=batch_size, window_size=window_size, lab_shifts=lab_shifts,
         rho_dfs=rho_dfs, pret_frac=pret_frac, fold_number=fold_number,
         nframes_tra=nframes_tra, nframes_pre=nframes_pre, nframes_test=nframes_test,
-        seed_sts=seed_sts, seed_label=seed_label)
+        seed_sts=seed_sts, seed_label=seed_label, pre_intervals=pre_intervals)
 
     train_dm: PredDataModule
     pretrain_dm: PredDataModule

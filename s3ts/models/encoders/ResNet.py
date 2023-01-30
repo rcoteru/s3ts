@@ -50,7 +50,7 @@ class ResNet_Encoder(LightningModule):
         super().__init__()
 
         self.channels = channels
-        self.n_feature_maps = 32
+        self.n_feature_maps = 24
 
         self.model = nn.Sequential(
             ResidualBlock(in_channels=channels, out_channels=self.n_feature_maps),
@@ -59,6 +59,7 @@ class ResNet_Encoder(LightningModule):
             ResidualBlock(in_channels=self.n_feature_maps * 2, out_channels=self.n_feature_maps * 4),
             nn.AvgPool2d((ref_size, window_size))
         )
+        self.flatten = nn.Flatten()
 
     @staticmethod
     def __str__() -> str:
@@ -68,6 +69,8 @@ class ResNet_Encoder(LightningModule):
         return (len(self.model._modules) -1) * self.n_feature_maps
 
     def forward(self, x):
-        return self.model(x.float())
+        out = self.model(x.float())
+        out = self.flatten(out)
+        return out
 
     

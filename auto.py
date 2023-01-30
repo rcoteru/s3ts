@@ -41,16 +41,15 @@ N_FRAMES_TRAIN = 5000
 N_FRAMES_PRE = 5000
 N_FRAMES_TEST = 5000
 
-LAB_SHIFTS = [[0], [0.15], [0.3]]
-
 STOP_METRIC = "val_f1"
 PRETRAIN_PATIENCE: int = 5
 PRETRAIN_MAXEPOCH: int = 5
 TRAIN_PATIENCE: int = 40
 TRAIN_MAXEPOCH: int = 5
 
+PRE_INTERVALS = [3, 5]
+LAB_SHIFTS = [[0], [0.15], [0.3]]
 ENCODERS = [CNN_Encoder, ResNet_Encoder]
-ENCODERS = [ResNet_Encoder]
 
 # =================================
 
@@ -65,8 +64,8 @@ for i, (train_index, test_index) in enumerate(skf.split(X, Y)):
     X_train, Y_train = X[train_index,:], Y[train_index]
     X_test, Y_test = X[test_index,:], Y[test_index]
 
-    for j, (arch, lab_shifts) in enumerate(
-        product(ENCODERS, LAB_SHIFTS)):
+    for j, (arch, lab_shifts, pre_intervals) in enumerate(
+        product(ENCODERS, LAB_SHIFTS, PRE_INTERVALS)):
 
         date_flag = datetime.now().strftime("%Y-%m-%d_%H-%M")
         subdir_name = f"{i}_{j}_{date_flag}"
@@ -74,7 +73,7 @@ for i, (train_index, test_index) in enumerate(skf.split(X, Y)):
         run_data = compare_pretrain(
             dataset=DATASET, arch=arch, rho_dfs=RHO_DFS, lab_shifts=lab_shifts,
             X_train= X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test,
-            directory=DIR / subdir_name, fold_number=i,
+            directory=DIR / subdir_name, fold_number=i, pre_intervals=pre_intervals,
             batch_size=BATCH_SIZE, window_size=WINDOW_SIZE,
             pret_frac=PRETRAIN_FRAC, stop_metric=STOP_METRIC,
             nframes_tra=N_FRAMES_TRAIN, nframes_pre=N_FRAMES_PRE, nframes_test=N_FRAMES_TEST,

@@ -84,7 +84,8 @@ class PredModel(LightningModule):
 
         """ Use for inference only (separate from training_step)"""
 
-        out = self.decoder(self.encoder(frame))
+        out = self.encoder(frame)
+        out = self.decoder(out)
         if self.n_shifts > 1:
             out = torch.stack(torch.split(out, self.n_labels, dim=1)).permute(1,0,2)
         return out
