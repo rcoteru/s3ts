@@ -6,16 +6,13 @@ Kind obvious tbh.
 """
 
 # data
-
-from s3ts.setup.pred import prepare_data_modules
-from s3ts.frames.pred import PredDataModule
-from s3ts.frames.base import BaseDataModule
+from s3ts.frames.modules import FramesDataModule
+from s3ts.setup import prepare_data_modules
 
 # models
 from s3ts.models.encoders.ResNet import ResNet_Encoder
 from s3ts.models.encoders.CNN import CNN_Encoder
-from s3ts.models.pred import PredModel
-from s3ts.models.base import BasicModel
+from s3ts.models.wrapper import PredModel
 
 # training
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint

@@ -9,7 +9,7 @@ import numpy as np
 
 # ================================================================= #
 
-class PredDataset(Dataset):
+class FramesDataset(Dataset):
 
     def __init__(self,
             frames: np.ndarray,
@@ -64,7 +64,7 @@ class PredDataset(Dataset):
 
 # ================================================================= #
 
-class PredDataModule(LightningDataModule):
+class FramesDataModule(LightningDataModule):
 
     def __init__(self,
             # calculate this outside
@@ -118,13 +118,13 @@ class PredDataModule(LightningDataModule):
                 self.DFS_train.std(axis=[1,2]))
 
         # training dataset
-        self.ds_train = PredDataset(
+        self.ds_train = FramesDataset(
             indexes=self.train_idx, lab_shifts=lab_shifts,
             frames=self.DFS_train, series=self.STS_train, labels=self.labels_train,
             window_size=self.window_size, transform=transform)
 
         # validation dataset
-        self.ds_eval = PredDataset(
+        self.ds_eval = FramesDataset(
             indexes=self.valid_idx, lab_shifts=lab_shifts,
             frames=self.DFS_train, series=self.STS_train, labels=self.labels_train, 
             window_size=self.window_size, transform=transform)
@@ -140,7 +140,7 @@ class PredDataModule(LightningDataModule):
             self.test_idx = np.arange(self.frame_buffer, nframes_test-np.max(lab_shifts))
             print("Test samples:", len(self.test_idx))
 
-            self.ds_test = PredDataset(
+            self.ds_test = FramesDataset(
                 indexes=self.test_idx, lab_shifts=lab_shifts,
                 frames=self.DFS_test, series=self.STS_test, labels=self.labels_test, 
                 window_size=self.window_size, transform=transform)

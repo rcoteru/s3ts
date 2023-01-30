@@ -10,7 +10,7 @@ from s3ts.frames.tasks.download import download_dataset
 # data
 from s3ts.models.encoders.ResNet import ResNet_Encoder
 from s3ts.models.encoders.CNN import CNN_Encoder
-from s3ts.setup.pred import compare_pretrain
+from s3ts.setup import compare_pretrain
 
 from sklearn.model_selection import StratifiedKFold
 
@@ -82,5 +82,5 @@ for i, (train_index, test_index) in enumerate(skf.split(X, Y)):
         )
 
         runs.append(run_data)
-        pd.concat(runs, ignore_index=True).to_csv("results.csv", index=False)
+        pd.concat(runs, ignore_index=True).to_csv("results/results.csv", index=False)
 

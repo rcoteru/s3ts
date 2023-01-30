@@ -8,8 +8,8 @@ from sklearn.preprocessing import KBinsDiscretizer
 
 # models / modules
 from pytorch_lightning import LightningModule
-from s3ts.frames.pred import PredDataModule
-from s3ts.models.pred import PredModel
+from s3ts.frames.modules import FramesDataModule
+from s3ts.models.wrapper import PredModel
 
 # training stuff
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
@@ -50,7 +50,7 @@ def prepare_data_modules(
         fold_number: int = 0,
         # ~~~~~~~~~~~~~~~~
         cache_dir: Path = Path("cache")
-        ) -> tuple[PredDataModule, PredDataModule]:
+        ) -> tuple[FramesDataModule, FramesDataModule]:
 
     """ Prepares the data modules. """
 
@@ -109,7 +109,7 @@ def prepare_data_modules(
     print("Creating 'train' dataset...")
 
     # create data module (train)
-    dm_tra = PredDataModule(
+    dm_tra = FramesDataModule(
         STS_train=STS_tra, DFS_train=DFS_tra, labels_train=labels_tra, nframes_train=nframes_tra,
         STS_test=STS_test, DFS_test=DFS_test, labels_test=labels_test, nframes_test=nframes_test,
         window_size=window_size, batch_size=batch_size, lab_shifts=[0])
@@ -121,7 +121,7 @@ def prepare_data_modules(
     print("Label shifts:", lab_shifts)    
 
     # create data module (pretrain)
-    dm_pre = PredDataModule(
+    dm_pre = FramesDataModule(
         STS_train=STS_pre, DFS_train=DFS_pre, labels_train=labels_pre, nframes_train=nframes_pre,
         window_size=window_size, batch_size=batch_size, lab_shifts=lab_shifts)   
 
@@ -208,8 +208,8 @@ def compare_pretrain(
         nframes_tra=nframes_tra, nframes_pre=nframes_pre, nframes_test=nframes_test,
         seed_sts=seed_sts, seed_label=seed_label, pre_intervals=pre_intervals)
 
-    train_dm: PredDataModule
-    pretrain_dm: PredDataModule
+    train_dm: FramesDataModule
+    pretrain_dm: FramesDataModule
 
     # ~~~~~~~~~~~~~~~~~~~~~ train without pretrain
 
