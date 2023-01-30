@@ -131,6 +131,6 @@ dmypy.json
 
 # Data folder
 data/
-.training
+training/
 cache/
 test/

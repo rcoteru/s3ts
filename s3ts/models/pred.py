@@ -64,11 +64,16 @@ class PredModel(LightningModule):
         if self.n_shifts == 1:
             for phase in ["train", "val", "test"]:
                 self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=n_labels, task="multiclass"))
-                self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=n_labels, task="multiclass", average="micro"))
+                self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=n_labels, task="multiclass"))
+                if phase != "train":
+                    self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=n_labels, task="multiclass"))
+
         elif self.n_shifts >= 2:
             for phase in ["train", "val", "test"]:
                 self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=n_labels, num_labels=self.n_shifts, task="multilabel"))
-                self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=n_labels, num_labels=self.n_shifts, task="multilabel", average="micro"))
+                self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=n_labels, num_labels=self.n_shifts, task="multilabel"))
+                if phase != "train":
+                    self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=n_labels, num_labels=self.n_shifts, task="multilabel"))
         else:
             raise RuntimeError("Need at least one value in label_shifts.")
 
@@ -108,9 +113,13 @@ class PredModel(LightningModule):
         if self.n_shifts > 1:
             acc = self.__getattr__(f"{stage}_acc")(output, y.to(torch.float32))
             f1  = self.__getattr__(f"{stage}_f1")(output, y.to(torch.float32))
+            if stage != "train":
+                auroc = self.__getattr__(f"{stage}_auroc")(output, y.to(torch.float32))
         else:
             acc = self.__getattr__(f"{stage}_acc")(output, torch.argmax(y, dim=1))
             f1  = self.__getattr__(f"{stage}_f1")(output, torch.argmax(y, dim=1))
+            if stage != "train":
+                auroc = self.__getattr__(f"{stage}_auroc")(output, torch.argmax(y, dim=1))
         
         if stage == "train":
             self.log(f"{stage}_loss", loss, sync_dist=True)
@@ -140,6 +149,8 @@ class PredModel(LightningModule):
 
         # metrics to analyze
         metrics = ["acc", "f1"]
+        if stage != "train":
+            metrics.append("auroc")
 
         # task flags
         if stage == "val":

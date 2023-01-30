@@ -42,7 +42,6 @@ def prepare_data_modules(
         # therse are needed for frame creation and imply recalcs
         rho_dfs: float,
         pret_frac: float,
-        test_frac: float,
         # ~~~~~~~~~~~~~~~~
         nframes_tra: int, 
         nframes_pre: int,
@@ -73,23 +72,23 @@ def prepare_data_modules(
     # STS generation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     print("Generating 'train' STS...")
-    STS_tra, labels_tra = compute_STS(X=X_tra,Y=Y_tra, target_nframes=4000, 
+    STS_tra, labels_tra = compute_STS(X=X_tra,Y=Y_tra, target_nframes=nframes_tra, 
         frame_buffer=window_size*3,random_state=seed_sts)
 
     print("Generating 'pretrain' STS...")
-    STS_pre, _, = compute_STS(X=X_pre, Y=Y_pre, target_nframes=4000, 
+    STS_pre, _, = compute_STS(X=X_pre, Y=Y_pre, target_nframes=nframes_pre, 
         frame_buffer=window_size*3,random_state=seed_sts)
     kbd = KBinsDiscretizer(n_bins=5, encode="ordinal", strategy="quantile", random_state=seed_sts)
     kbd.fit(STS_pre.reshape(-1,1))
     labels_pre = kbd.transform(STS_pre.reshape(-1,1)).squeeze().astype(int)
     
     print("Generating 'test' STS...")
-    STS_test, labels_test = compute_STS(X=X_test, Y=Y_test, target_nframes=4000, 
+    STS_test, labels_test = compute_STS(X=X_test, Y=Y_test, target_nframes=nframes_test, 
         frame_buffer=window_size*3,random_state=seed_sts)
 
     # DFS generation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    fracs = f"{test_frac}-{pret_frac}"
+    fracs = f"{pret_frac}"
     seeds = f"{fold_number}-{seed_label}-{seed_sts}"
     frames = f"{nframes_tra}-{nframes_pre}-{nframes_test}"
     cache_file = cache_dir / f"DFS_{dataset}_{fracs}_{seeds}_{frames}.npz"
@@ -143,9 +142,9 @@ def setup_trainer(
     checkpoint = ModelCheckpoint(monitor=stop_metric, mode="max")    
     trainer = Trainer(default_root_dir=directory,  accelerator="auto",
         # progress logs
-        loggers = [
-            TensorBoardLogger(save_dir=directory, name="logs",),
-            CSVLogger(save_dir=directory, name="logs")
+        logger = [
+            TensorBoardLogger(save_dir=directory, name="logs", version=version),
+            CSVLogger(save_dir=directory, name="logs", version=version)
         ],
         callbacks=[
             # early stop the model
@@ -197,17 +196,18 @@ def compare_pretrain(
 
     seed_everything(seed_torch)
 
-    results = pd.Series()
-    results["dataset"], results["fold_number"], results["decoder"] = dataset, fold_number, str(type(LightningModule))
+    results = pd.Series(dtype="object")
+    results["dataset"], results["fold_number"], results["decoder"] = dataset, fold_number, arch.__str__()
+    results["seed_sts"], results["seed_label"], results["fold_number"] = seed_sts, seed_label, fold_number
     results["batch_size"], results["window_size"], results["lab_shifts"] = batch_size, window_size, lab_shifts
     results["nframes_tra"], results["nframes_pre"],results["nframes_test"] = nframes_tra, nframes_pre, nframes_test
-    results["seed_sts"], results["seed_label"], results["seed_test"] = seed_sts, seed_label
-
+    
     train_dm, pretrain_dm = prepare_data_modules(dataset=dataset,
+        X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test,
         batch_size=batch_size, window_size=window_size, lab_shifts=lab_shifts,
         rho_dfs=rho_dfs, pret_frac=pret_frac, fold_number=fold_number,
         nframes_tra=nframes_tra, nframes_pre=nframes_pre, nframes_test=nframes_test,
-        seed_sts=seed_sts, seed_label=seed_label, fold_number=fold_number)
+        seed_sts=seed_sts, seed_label=seed_label)
 
     train_dm: PredDataModule
     pretrain_dm: PredDataModule
@@ -220,10 +220,11 @@ def compare_pretrain(
             n_patterns=train_dm.n_patterns,
             l_patterns=train_dm.l_patterns,
             window_size=train_dm.window_size,
+            lab_shifts=[0],
             arch=arch) 
 
     # train the model
-    trainer, checkpoint = setup_trainer(directory=directory,  version="default",
+    trainer, checkpoint = setup_trainer(directory=directory,  version="def",
         epoch_max=tra_maxepoch, epoch_patience=tra_patience, stop_metric=stop_metric)
     trainer.fit(train_model, datamodule=train_dm)
     train_model = train_model.load_from_checkpoint(checkpoint.best_model_path)
@@ -232,13 +233,17 @@ def compare_pretrain(
     test_results = trainer.test(train_model, datamodule=train_dm)
     
     # log results
-    results["default_val_acc"] = valid_results[0]["val_acc"]
-    results["default_val_f1"] = valid_results[0]["val_f1"]
-    results["default_val_auroc"] = valid_results[0]["val_auroc"]
+    results["def_val_acc"] = valid_results[0]["val_acc"]
+    results["def_val_f1"] = valid_results[0]["val_f1"]
+    results["def_val_auroc"] = valid_results[0]["val_auroc"]
 
-    results["default_test_acc"] = test_results[0]["test_acc"]
-    results["default_test_f1"] = test_results[0]["test_f1"]
-    results["default_test_auroc"] = test_results[0]["test_auroc"]
+    results["def_test_acc"] = test_results[0]["test_acc"]
+    results["def_test_f1"] = test_results[0]["test_f1"]
+    results["def_test_auroc"] = test_results[0]["test_auroc"]
+
+    results["def_best_model"] = checkpoint.best_model_path
+    results["def_train_csv"] = str(directory  / "logs" / "def" / "metrics.csv")
+    results["def_nepochs"] = pd.read_csv(results["def_train_csv"])["epoch_train_acc"].count()
 
     # ~~~~~~~~~~~~~~~~~~~~~ do the pretrain
 
@@ -260,7 +265,11 @@ def compare_pretrain(
     # log results
     results["aux_val_acc"] = valid_results[0]["val_acc"]
     results["aux_val_f1"] = valid_results[0]["val_f1"]
-    
+
+    results["aux_best_model"] = checkpoint.best_model_path
+    results["aux_train_csv"] = str(directory  / "logs" / "aux" / "metrics.csv")
+    results["aux_nepochs"] = pd.read_csv(results["aux_train_csv"])["epoch_train_acc"].count()
+
     # grab the pretrained encoder
     pretrained_encoder = pretrain_model.encoder
 
@@ -271,9 +280,10 @@ def compare_pretrain(
             n_patterns=train_dm.n_patterns,
             l_patterns=train_dm.l_patterns,
             window_size=train_dm.window_size,
+            lab_shifts=[0],
             arch=arch) 
     train_model.encoder = pretrained_encoder
-    trainer, checkpoint = setup_trainer(directory=directory,  version="pretrain",
+    trainer, checkpoint = setup_trainer(directory=directory,  version="pre",
         epoch_max=tra_maxepoch, epoch_patience=tra_patience, stop_metric=stop_metric)
     trainer.fit(train_model, datamodule=train_dm)
     train_model = train_model.load_from_checkpoint(checkpoint.best_model_path)
@@ -281,12 +291,19 @@ def compare_pretrain(
     test_results = trainer.test(train_model, datamodule=train_dm)
 
     # log results
-    results["pretrain_val_acc"] = valid_results[0]["val_acc"]
-    results["pretrain_val_f1"] = valid_results[0]["val_f1"]
-    results["pretrain_val_auroc"] = valid_results[0]["val_auroc"]
+    results["pre_val_acc"] = valid_results[0]["val_acc"]
+    results["pre_val_f1"] = valid_results[0]["val_f1"]
+    results["pre_val_auroc"] = valid_results[0]["val_auroc"]
 
-    results["pretrain_test_acc"] = test_results[0]["test_acc"]
-    results["pretrain_test_f1"] = test_results[0]["test_f1"]
-    results["pretrain_test_auroc"] = test_results[0]["test_auroc"]
+    results["pre_test_acc"] = test_results[0]["test_acc"]
+    results["pre_test_f1"] = test_results[0]["test_f1"]
+    results["pre_test_auroc"] = test_results[0]["test_auroc"]
+
+    results["pre_best_model"] = checkpoint.best_model_path
+    results["pre_train_csv"] = str(directory  / "logs" / "pre" / "metrics.csv")
+    results["pre_nepochs"] = pd.read_csv(results["pre_train_csv"])["epoch_train_acc"].count()
+    
+    print("\nTraining summary:")
+    print(results)
 
     return results.to_frame().transpose().copy()

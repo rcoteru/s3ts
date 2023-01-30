@@ -32,6 +32,10 @@ class CNN_Encoder(LightningModule):
         self.linear_1 = self.dynamic_linear((1, channels, ref_size, window_size))
         self.linear_2 = nn.Linear(in_features=self.n_feature_maps * 4, out_features=self.n_feature_maps * 8)
 
+    @staticmethod
+    def __str__() -> str:
+        return "CNN"
+
     def dynamic_linear(self, image_dim):
         x = torch.rand(*(image_dim))
         features = self.model(x.float())

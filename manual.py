@@ -29,7 +29,7 @@ from pathlib import Path
 # SETTINGS
 # =================================
 
-DIR = Path("test")
+DIR = Path("training/manual")
 
 DATASET = "GunPoint"
 PRETRAIN = 1

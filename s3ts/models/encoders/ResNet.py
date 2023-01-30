@@ -36,9 +36,9 @@ class ResidualBlock(LightningModule):
         elif hasattr(m, 'bias') and m.bias is not None:
             nn.init.constant_(m.bias.data, 0)
 
-    def forward(self, x):
-        block = self.block(x.float())
-        shortcut = self.shortcut(x.float())
+    def forward(self, x: torch.Tensor):
+        block = self.block(x)
+        shortcut = self.shortcut(x)
 
         block = torch.add(block, shortcut)
         return nn.functional.relu(block)
@@ -59,6 +59,10 @@ class ResNet_Encoder(LightningModule):
             ResidualBlock(in_channels=self.n_feature_maps * 2, out_channels=self.n_feature_maps * 4),
             nn.AvgPool2d((ref_size, window_size))
         )
+
+    @staticmethod
+    def __str__() -> str:
+        return "ResNet"
 
     def get_output_shape(self):
         return (len(self.model._modules) -1) * self.n_feature_maps

@@ -14,15 +14,19 @@ from s3ts.setup.pred import compare_pretrain
 
 from sklearn.model_selection import StratifiedKFold
 
+from datetime import datetime
 from itertools import product
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import torch
+
+torch.set_float32_matmul_precision("medium")
 
 # SETTINGS
 # =================================
 
-DIR = Path("training")
+DIR = Path("training/auto")
 
 SEED = 0
 NSPLITS  = 10
@@ -33,23 +37,26 @@ BATCH_SIZE = 128
 PRETRAIN_FRAC = 0.8
 DATASET = "GunPoint"
 
+N_FRAMES_TRAIN = 5000
+N_FRAMES_PRE = 5000
+N_FRAMES_TEST = 5000
+
 LAB_SHIFTS = [[0], [0.15], [0.3]]
 
 STOP_METRIC = "val_f1"
-PRETRAIN_PATIENCE: int = 5,
-PRETRAIN_MAXEPOCH: int = 100,
-TRAIN_PATIENCE: int = 40,
-TRAIN_MAXEPOCH: int = 200,
+PRETRAIN_PATIENCE: int = 5
+PRETRAIN_MAXEPOCH: int = 5
+TRAIN_PATIENCE: int = 40
+TRAIN_MAXEPOCH: int = 5
 
-ENCODERS = [CNN_Encoder]#, ResNet_Encoder]
+ENCODERS = [CNN_Encoder, ResNet_Encoder]
+ENCODERS = [ResNet_Encoder]
 
 # =================================
-
 
 X, Y, mapping = download_dataset(DATASET)
 
 runs = list()
-
 print(f"Train-test K-Fold validation: ({NSPLITS} splits)")
 skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=SEED)
 for i, (train_index, test_index) in enumerate(skf.split(X, Y)):
@@ -58,23 +65,23 @@ for i, (train_index, test_index) in enumerate(skf.split(X, Y)):
     X_train, Y_train = X[train_index,:], Y[train_index]
     X_test, Y_test = X[test_index,:], Y[test_index]
 
-    for j, (arch, lab_shifts) in enumerate(product(ENCODERS, LAB_SHIFTS)):
+    for j, (arch, lab_shifts) in enumerate(
+        product(ENCODERS, LAB_SHIFTS)):
+
+        date_flag = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        subdir_name = f"{i}_{j}_{date_flag}"
 
         run_data = compare_pretrain(
-            dataset=DATASET, arch=arch, rho_dfs=RHO_DFS
-            X_train= X_train, X_test=X_test, Y_train=Y_train,
-            directory=DIR / "whatever shit i come up with", 
+            dataset=DATASET, arch=arch, rho_dfs=RHO_DFS, lab_shifts=lab_shifts,
+            X_train= X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test,
+            directory=DIR / subdir_name, fold_number=i,
             batch_size=BATCH_SIZE, window_size=WINDOW_SIZE,
-            pret_frac=PRETRAIN_FRAC, stop_metric=STOP_METRIC
-            nframes_tra=N_FRAMES,
+            pret_frac=PRETRAIN_FRAC, stop_metric=STOP_METRIC,
+            nframes_tra=N_FRAMES_TRAIN, nframes_pre=N_FRAMES_PRE, nframes_test=N_FRAMES_TEST,
             pre_patience=PRETRAIN_PATIENCE, pre_maxepoch=PRETRAIN_MAXEPOCH,
             tra_patience=TRAIN_PATIENCE, tra_maxepoch=TRAIN_MAXEPOCH,
         )
+
         runs.append(run_data)
-        pd.concat(runs, ignore_index=True).to_csv("results.csv")
+        pd.concat(runs, ignore_index=True).to_csv("results.csv", index=False)
 
-
-# data = pd.DataFrame()
-
-# for seed in SEEDS:
-#     for seed
