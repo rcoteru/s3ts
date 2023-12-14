@@ -5,7 +5,7 @@ from pandas import Series
 from s3ts.api.simulation import StreamSimulator, samples_from_simulator
 from s3ts.api.ts2sts import fin_random_STS, fin_balanced_STS
 from s3ts.api.encodings import compute_DM, compute_GM
-from s3ts.api.dms.base import StreamingFramesDM
+from s3ts.data.base import StreamingFramesDM
 
 from torch.utils.data import Dataset, DataLoader
 from typing import Optional, Literal, Any

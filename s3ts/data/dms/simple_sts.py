@@ -3,7 +3,7 @@
 
 # torch / lightning imports
 from torch.utils.data import Dataset, DataLoader
-from s3ts.api.dms.base import StreamingFramesDM
+from s3ts.data.base import StreamingFramesDM
 import torchvision as tv
 import torch
 

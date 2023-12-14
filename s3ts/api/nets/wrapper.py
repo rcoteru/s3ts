@@ -17,7 +17,7 @@ from s3ts.api.nets.encoders.series.simpleCNN import SimpleCNN_TS
 from s3ts.api.nets.decoders.linear import LinearDecoder
 from s3ts.api.nets.decoders.mlp import MultiLayerPerceptron
 
-from s3ts.dtw_layer.dtw_layer import DTWLayer
+from s3ts.api.nets.encoders.dtw.dtw_layer import DTWLayer
 
 # base torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau

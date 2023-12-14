@@ -52,10 +52,6 @@ def unpack(dataset_name = "all", dataset_dir=None):
             unpack(dataset_name=name, dataset_dir=dataset_dir)
         return None
     
-    if dataset_name in ["WISDM"]:
-        unpack_wisdm(dataset_dir)
-        return 0
-
     if not os.path.exists(f"{dataset_dir}/{dataset_name}") or not os.listdir(f"{dataset_dir}/{dataset_name}/"):
         return print(f"Dataset is not downloaded to {dataset_dir}/{dataset_name}/")
     
@@ -69,8 +65,7 @@ def unpack(dataset_name = "all", dataset_dir=None):
         return print(f"Dataset {dataset_name} already unpacked")
 
     if dataset_name in ["WISDM", "TempestaTMD"]:
-        # use gzip to decompress
-        pass
+        unpack_tar(dataset_dir, dataset_name)
     else:
         print(os.path.join(f"{dataset_dir}/{dataset_name}", files[-1]))
         # use zipfile to decompress
@@ -84,8 +79,8 @@ def unpack(dataset_name = "all", dataset_dir=None):
                 with zipfile.ZipFile(os.path.join(f"{dataset_dir}/{dataset_name}", new_file), "r") as zip_ref:
                     zip_ref.extractall(f"{dataset_dir}/{dataset_name}")
 
-def unpack_wisdm(dataset_dir):
-    ds_dir = os.path.join(dataset_dir, "WISDM")
+def unpack_tar(dataset_dir, dataset_name):
+    ds_dir = os.path.join(dataset_dir, dataset_name)
     assert os.path.exists(ds_dir)
 
     files = os.listdir(ds_dir)
@@ -377,20 +372,20 @@ def extract_and_save_sensor_data(directory, user, mode):
 
 if __name__ == "__main__":
     #download("UCI-HAR", "./datasets")
-    #download("HARTH", "./datasets")
-    #download("MHEALTH", "./datasets")
+    download("HARTH", "./datasets")
+    download("MHEALTH", "./datasets")
     download("WISDM", "./datasets")
     #download("REALDISP", "./datasets")
 
     #unpack("UCI-HAR", "./datasets")
-    #unpack("HARTH", "./datasets")
-    #unpack("MHEALTH", "./datasets")
+    unpack("HARTH", "./datasets")
+    unpack("MHEALTH", "./datasets")
     unpack("WISDM", "./datasets")
     #unpack("REALDISP", "./datasets")
 
     #prepare_uci_har("./datasets/UCI-HAR")
-    #prepare_harth("./datasets/HARTH")
-    #prepare_mhealth("./datasets/MHEALTH")
+    prepare_harth("./datasets/HARTH")
+    prepare_mhealth("./datasets/MHEALTH")
     prepare_wisdm("./datasets/WISDM")
     #prepare_realdisp("./datasets/REALDISP")
 

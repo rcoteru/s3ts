@@ -1,10 +1,64 @@
 import numpy as np
 import torch
 
-from storage.har_datasets import StreamingTimeSeriesCopy, STSDataset, reduce_imbalance
-
+from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader
+
+from s3ts.data.base import STSDataset
+from s3ts.data.methods import reduce_imbalance
+
+class StreamingTimeSeries(STSDataset):
+
+    def __init__(self,
+            STS: np.ndarray,
+            SCS: np.ndarray,
+            wsize: int = 10,
+            wstride: int = 1,
+            normalize: bool = True,
+            label_mapping: np.ndarray = None
+            ) -> None:
+        super().__init__(wsize=wsize, wstride=wstride)
+
+        self.STS = STS
+        self.SCS = SCS
+
+        self.splits = np.array([0, SCS.shape[0]])
+
+        # process ds
+        self.label_mapping = label_mapping
+        if not self.label_mapping is None:
+            self.SCS = self.label_mapping[self.SCS]
+
+        self.indices = np.arange(self.SCS.shape[0])
+        for i in range(wsize * wstride):
+            self.indices[self.splits[:-1] + i] = 0
+        self.indices = self.indices[np.nonzero(self.indices)]
+
+        if normalize:
+            self.normalizeSTS("normal")
+
+
+class StreamingTimeSeriesCopy(Dataset):
+
+    def __init__(self,
+            stsds: StreamingTimeSeries, indices: np.ndarray
+            ) -> None:
+        super().__init__()
+
+        self.stsds = stsds
+        self.indices = indices
+        
+    def __len__(self):
+        return self.indices.shape[0]
+    
+    def __getitem__(self, index) -> tuple[torch.Tensor, torch.Tensor, int]:
+
+        ts, c = self.stsds[self.indices[index]]
+        return {"series": ts, "label": c[-1]}
+    
+    def __del__(self):
+        del self.stsds
+
 
 class LSTSDataset(LightningDataModule):
 

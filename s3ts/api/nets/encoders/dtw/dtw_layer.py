@@ -1,6 +1,6 @@
 import torch
 
-from s3ts.dtw_layer.dtw import torch_dtw
+from s3ts.api.nets.encoders.dtw.dtw import torch_dtw
 
 class DTWLayer(torch.nn.Module):
     def __init__(self, n_patts, d_patts, l_patts, l_out: int = None, rho: float = 1) -> None:

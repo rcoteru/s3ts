@@ -5,10 +5,12 @@ start_time = time()
 str_time = lambda b: f"{int(b//3600):02d}:{int((b%3600)//60):02d}:{int((b%3600)%60):02d}.{int(round(b%1, 3)*1000):03d}"
 
 # dataset imports
-from storage.har_datasets import *
-from s3ts.api.dms.har_datasets import LDFDataset, DFDataset
-from s3ts.dtw_layer.lightningstsds import LSTSDataset
-from storage.label_mappings import *
+from s3ts.data.har_datasets import *
+from s3ts.data.dfdataset import LDFDataset, DFDataset
+from s3ts.data.stsdataset import LSTSDataset
+from s3ts.data.label_mappings import *
+from s3ts.data.methods import *
+
 from torchvision.transforms import Normalize
 
 def load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize):

@@ -1,4 +1,4 @@
-from helper_functions import *
+from s3ts.helper_functions import *
 import multiprocessing
 
 from s3ts.api.nets.methods import create_model_from_DM, train_model

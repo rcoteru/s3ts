@@ -3,12 +3,10 @@
 import os
 
 from torch.utils.data import Dataset, DataLoader
-from s3ts.api.dms.base import StreamingFramesDM
+from s3ts.data.base import StreamingFramesDM
 from s3ts.api.encodings import compute_DM, compute_oDTW
 import torchvision as tv
 import torch
-
-import h5py
 
 import sys
 
@@ -16,7 +14,8 @@ import sys
 import multiprocessing as mp
 import numpy as np
 
-from storage.har_datasets import STSDataset, reduce_imbalance
+from s3ts.data.base import STSDataset
+from s3ts.data.methods import reduce_imbalance
 
 import hashlib
 

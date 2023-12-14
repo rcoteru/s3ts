@@ -11,7 +11,7 @@ from pytorch_lightning import Trainer, seed_everything
 
 # in-package imports
 from s3ts.api.nets.wrapper import WrapperModel
-from s3ts.api.dms.base import StreamingFramesDM
+from s3ts.data.base import StreamingFramesDM
 
 # other imports
 import numpy as np
