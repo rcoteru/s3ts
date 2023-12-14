@@ -1,0 +1,14 @@
+time: "5-00:00:00"
+account: null
+partition: large
+cpu: 8
+mem: 16
+gres: null
+constraint: skl|bdw
+email: null
+env_script: /workspace/scratch/users/rcoterillo/s3ts/s3ts_env/bin/activate
+cli_script: /workspace/scratch/users/rcoterillo/s3ts/s3ts/cli.py
+jobs_dir: jobs/
+logs_dir: logs/
+modules:      
+  - Python/3.10.4-GCCcore-11.3.0
