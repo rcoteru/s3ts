@@ -8,7 +8,7 @@ from tslearn.clustering import TimeSeriesKMeans
 
 # Methods to obtain patterns
 
-def sts_medoids(dataset: STSDataset, n = 100, pattern_size = -1, random_seed: int = 45):
+def sts_medoids(dataset: STSDataset, n = 100, pattern_size = -1, meds_per_class = 1, random_seed: int = 45):
     np.random.seed(random_seed)
 
     window_id, window_lb = dataset.getSameClassWindowIndex()
@@ -29,7 +29,7 @@ def sts_medoids(dataset: STSDataset, n = 100, pattern_size = -1, random_seed: in
     selected_w = np.concatenate(selected_w) # (n, dims, len)
     if pattern_size>0:
         selected_w = selected_w[:,:,-pattern_size:]
-    meds, meds_id = compute_medoids(selected_w, np.concatenate(selected_c, axis=0))
+    meds, meds_id = compute_medoids(selected_w, np.concatenate(selected_c, axis=0), meds_per_class=meds_per_class)
 
     return meds[:,0,:,:]
 
@@ -60,11 +60,11 @@ def reduce_imbalance(indices, labels, seed = 42):
     rng.manual_seed(seed)
 
     cl, counts = torch.unique(labels, return_counts=True)
-    mean = counts.float().mean()
+    median = counts.float().median()
 
     mask = torch.ones_like(labels, dtype=bool)
-    for id in torch.argwhere(counts > mean):
-        mask[labels == cl[id]] = torch.rand(counts[id], generator=rng) < counts[torch.arange(counts.shape[0]) != id].float().mean()/counts[id]
+    for id in torch.argwhere(counts > median):
+        mask[labels == cl[id]] = torch.rand(counts[id], generator=rng) < median/counts[id]
     
     return indices[mask]
 
