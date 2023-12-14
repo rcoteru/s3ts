@@ -4,7 +4,6 @@
 """ Wrapper model for the deep learning models. """
 
 from __future__ import annotations
-from typing import Literal
 
 # modules
 from pytorch_lightning import LightningModule
@@ -13,7 +12,12 @@ from s3ts.api.nets.encoders.frames.RES import RES_IMG
 from s3ts.api.nets.encoders.series.RNN import RNN_TS
 from s3ts.api.nets.encoders.series.CNN import CNN_TS
 from s3ts.api.nets.encoders.series.RES import RES_TS
+from s3ts.api.nets.encoders.frames.simpleCNN import SimpleCNN_IMG
+from s3ts.api.nets.encoders.series.simpleCNN import SimpleCNN_TS
 from s3ts.api.nets.decoders.linear import LinearDecoder
+from s3ts.api.nets.decoders.mlp import MultiLayerPerceptron
+
+from s3ts.dtw_layer.dtw_layer import DTWLayer
 
 # base torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -23,13 +27,16 @@ import torch.nn as nn
 import numpy as np
 import torch
 
-encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG},
-    "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS}}
+encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG},
+    "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS, "simplecnn": SimpleCNN_TS},
+    "dtw": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG}}
+
+decoder_dict = {"linear": LinearDecoder, "mlp": MultiLayerPerceptron}
 
 class WrapperModel(LightningModule):
 
     name: str           # model name
-    dsrc: str           # input dsrc: ["img", "ts"]
+    dsrc: str          # input dsrc: ["img", "ts"]
     arch: str           # architecture: ["rnn", "cnn", "res"]
     task: str           # task type: ["cls", "reg"]
 
@@ -46,10 +53,10 @@ class WrapperModel(LightningModule):
     dedsrcc_feats: int      # decoder feature hyperparam
     lr: float           # learning rate
 
-    def __init__(self, dsrc, arch, task,
+    def __init__(self, dsrc, arch, dec_arch, task,
         n_dims, n_classes, n_patterns, l_patterns,
         wdw_len, wdw_str, sts_str,
-        enc_feats, dec_feats, lr,
+        enc_feats, dec_feats, dec_layers, lr,
         name=None) -> None:
 
         """ Wrapper for the PyTorch models used in the experiments. """
@@ -75,7 +82,11 @@ class WrapperModel(LightningModule):
             ref_size, channels = l_patterns, n_patterns
         elif dsrc == "ts":
             ref_size, channels = 1, self.n_dims
- 
+        elif dsrc == "dtw":
+            self.dtw_layer = DTWLayer(n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=l_patterns, rho=0.01)
+            ref_size, channels = l_patterns, enc_feats
+            self.wdw_len = ref_size
+
         encoder = enc_arch(channels=channels, ref_size=ref_size, 
             wdw_size=self.wdw_len, n_feature_maps=self.enc_feats)
         
@@ -89,8 +100,8 @@ class WrapperModel(LightningModule):
         elif self.task == "reg":
             out_feats = self.wdw_len if self.sts_str else self.wdw_len*self.wdw_str
             out_feats = out_feats*n_dims
-        self.decoder = LinearDecoder(inp_feats=inp_feats, 
-            hid_feats=dec_feats, out_feats=out_feats, hid_layers=2)
+        self.decoder = decoder_dict[dec_arch](inp_feats=inp_feats, 
+            hid_feats=dec_feats, out_feats=out_feats, hid_layers=dec_layers)
 
         # create softmax and flatten layers
         self.flatten = nn.Flatten(start_dim=1)
@@ -101,8 +112,7 @@ class WrapperModel(LightningModule):
             for phase in ["train", "val", "test"]: 
                 self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=out_feats, task="multiclass"))
                 self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=out_feats, task="multiclass"))
-                if phase != "train":
-                    self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=out_feats, task="multiclass"))
+                self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=out_feats, task="multiclass"))
         elif self.task == "reg":
             for phase in ["train", "val", "test"]:
                 self.__setattr__(f"{phase}_mse", tm.MeanSquaredError(squared=False))
@@ -110,6 +120,8 @@ class WrapperModel(LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward pass. """
+        if self.dsrc == "dtw":
+            x = self.dtw_layer(x)
         x = self.encoder(x)
         x = self.flatten(x)
         x = self.decoder(x)
@@ -119,64 +131,71 @@ class WrapperModel(LightningModule):
             bsize = x.shape[0]
             x = x.reshape((bsize, self.n_dims, -1))
         return x
+    
+    def logits(self, x: torch.Tensor) -> torch.Tensor:
+        if self.dsrc == "dtw":
+            x = self.dtw_layer(x)
+        x = self.encoder(x)
+        x = self.flatten(x)
+        x = self.decoder(x)
+        return x
 
-    def _inner_step(self, batch: dict[str, torch.Tensor], stage: Literal["train", "val", "test"]) -> torch.Tensor:
+    def _inner_step(self, batch: dict[str: torch.Tensor], stage: str = None):
 
         """ Inner step for the training, validation and testing. """
 
         # Forward pass
         if self.dsrc == "img":
-            output: torch.Tensor = self(batch["frame"])
-        elif self.dsrc == "ts":
-            output: torch.Tensor = self(batch["series"])
+            output = self.logits(batch["frame"])
+        elif self.dsrc == "ts" or self.dsrc == "dtw":
+            output = self.logits(batch["series"])
 
         # Compute the loss and metrics
         if self.task == "cls":
-            oh_label: torch.Tensor = F.one_hot(batch["label"], 
-                                        num_classes=self.n_classes)
-            loss = F.cross_entropy(output, oh_label.to(torch.float32)) # type: ignore
-            acc = self.__getattr__(f"{stage}_acc")(output, batch["label"]) # type: ignore
-            f1  = self.__getattr__(f"{stage}_f1")(output, batch["label"]) # type: ignore
-            if stage != "train":
-                auroc = self.__getattr__(f"{stage}_auroc")(output, batch["label"])   # type: ignore
+            # oh_label: torch.Tensor = F.one_hot(batch["label"], 
+            #                             num_classes=self.n_classes)
+            loss = F.cross_entropy(output, batch["label"])
+            acc = self.__getattr__(f"{stage}_acc")(output, batch["label"])
+            f1  = self.__getattr__(f"{stage}_f1")(output, batch["label"])
+            auroc = self.__getattr__(f"{stage}_auroc")(output, batch["label"])  
         elif self.task == "reg":
-            loss = F.mse_loss(output, batch["series"]) # type: ignore
-            mse = self.__getattr__(f"{stage}_mse")(output, batch["series"]) # type: ignore
-            r2 = self.__getattr__(f"{stage}_r2")(self.flatten(output), self.flatten(batch["series"])) # type: ignore
+            loss = F.mse_loss(output, batch["series"])
+            mse = self.__getattr__(f"{stage}_mse")(output, batch["series"])
+            r2 = self.__getattr__(f"{stage}_r2")(self.flatten(output), 
+                                                 self.flatten(batch["series"]))
 
         # log loss and metrics
         on_step = True if stage == "train" else False
-        self.log(f"{stage}_loss", loss, on_epoch=True, on_step=on_step, prog_bar=True, logger=True) # type: ignore
+        self.log(f"{stage}_loss", loss, on_epoch=True, on_step=on_step, prog_bar=True, logger=True)
         if self.task == "cls":
-            self.log(f"{stage}_acc", acc, on_epoch=True, on_step=False, prog_bar=True, logger=True) # type: ignore
-            self.log(f"{stage}_f1", f1, on_epoch=True, on_step=False, prog_bar=False, logger=True) # type: ignore
-            if stage != "train":
-                self.log(f"{stage}_auroc", auroc, on_epoch=True, on_step=False, prog_bar=True, logger=True) # type: ignore
+            self.log(f"{stage}_acc", acc, on_epoch=True, on_step=False, prog_bar=True, logger=True)
+            self.log(f"{stage}_f1", f1, on_epoch=True, on_step=False, prog_bar=False, logger=True)
+            self.log(f"{stage}_auroc", auroc, on_epoch=True, on_step=False, prog_bar=True, logger=True)
         elif self.task == "reg":
-            self.log(f"{stage}_mse", mse, on_epoch=True, on_step=False, prog_bar=True, logger=True) # type: ignore
-            self.log(f"{stage}_r2", r2, on_epoch=True, on_step=False, prog_bar=True, logger=True) # type: ignore
+            self.log(f"{stage}_mse", mse, on_epoch=True, on_step=False, prog_bar=True, logger=True)
+            self.log(f"{stage}_r2", r2, on_epoch=True, on_step=False, prog_bar=True, logger=True)
 
         # return loss
-        return loss.to(torch.float32) # type: ignore
+        return loss.to(torch.float32)
 
-    def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def training_step(self, batch: dict[str: torch.Tensor], batch_idx: int):
         """ Training step. """
         return self._inner_step(batch, stage="train")
         
-    def validation_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def validation_step(self, batch: dict[str: torch.Tensor], batch_idx: int):
         """ Validation step. """
         return self._inner_step(batch, stage="val")
 
-    def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def test_step(self, batch: dict[str: torch.Tensor], batch_idx: int):
         """ Validation step. """
         return self._inner_step(batch, stage="test")
 
-    def predict_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def predict_step(self, batch: dict[str: torch.Tensor], batch_idx: int):
         """ Predict step. """
         if self.dsrc == "img":
-            output: torch.Tensor = self(batch["frame"])
+            output = self(batch["frame"])
         elif self.dsrc == "ts":
-            output: torch.Tensor = self(batch["series"])
+            output = self(batch["series"])
         return output
 
     def configure_optimizers(self):

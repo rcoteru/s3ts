@@ -114,7 +114,6 @@ venv.bak/
 # Spyder project settings
 .spyderproject
 .spyproject
-.vscode
 
 # Rope project settings
 .ropeproject
@@ -135,3 +134,9 @@ training/
 cache/
 test/
 results/
+
+# ignore changes to datasets folder
+storage/datasets
+datasets
+cache*
+lightning_logs

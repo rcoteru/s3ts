@@ -11,7 +11,7 @@ from pytorch_lightning import Trainer, seed_everything
 
 # in-package imports
 from s3ts.api.nets.wrapper import WrapperModel
-from s3ts.api.dm.base import StreamingFramesDM
+from s3ts.api.dms.base import StreamingFramesDM
 
 # other imports
 import numpy as np
@@ -31,7 +31,7 @@ default_lr = 1E-4
 default_dec_feats: int = 64
 default_enc_feats: dict[dict[int]] = { 
     "ts": {"rnn": 40, "cnn": 48, "res": 16},
-    "img": {"cnn": 20, "res": 12}}
+    "img": {"cnn": 20, "res": 12, "simplecnn": 32}}
 
 # metrics settings
 metric_settings: dict = {
@@ -41,8 +41,8 @@ metric_settings: dict = {
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def create_model_from_DM(dm:  StreamingFramesDM, dsrc: str, arch: str, task: str, name: str = None,
-        enc_feats: int = None, dec_feats: int = None, lr: float = default_lr
+def create_model_from_DM(dm:  StreamingFramesDM, dsrc: str, arch: str, dec_arch: str, task: str, name: str = None,
+        enc_feats: int = None, dec_feats: int = None, dec_layers: int = None, lr: float = default_lr
         ) -> WrapperModel:
     
     # use defaults values if needed
@@ -56,6 +56,7 @@ def create_model_from_DM(dm:  StreamingFramesDM, dsrc: str, arch: str, task: str
         name=name,
         dsrc=dsrc,
         arch=arch,
+        dec_arch=dec_arch,
         task= task,
         wdw_len=dm.wdw_len,
         wdw_str=dm.wdw_str,
@@ -66,6 +67,7 @@ def create_model_from_DM(dm:  StreamingFramesDM, dsrc: str, arch: str, task: str
         l_patterns=dm.l_patterns,
         enc_feats=enc_feats,
         dec_feats=dec_feats,
+        dec_layers=dec_layers,
         lr=lr)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

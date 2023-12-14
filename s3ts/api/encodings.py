@@ -1,7 +1,7 @@
 from numba import jit, prange
-from typing import Optional
 from math import sqrt
 import numpy as np
+import torch
 
 # Disimilarity Frames
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -12,7 +12,7 @@ def compute_DM(
         patts: np.ndarray, 
         rho: float, 
         metric: str = "euclidean",
-        prev_col: Optional[np.ndarray] = None,
+        prev_col: np.ndarray = None,
         ) -> np.ndarray:
     
     if metric not in ["euclidean", "squared"]:
@@ -31,8 +31,7 @@ def compute_DM(
             for i in prange(lpatts):
                 for j in prange(STS_len):
                     for k in prange(dpatts):
-                        DM[p, i, j] += (patts[p,k,i] - STS[k,j])**2
-                    DM[p, i, j] = sqrt(DM[p, i, j])
+                        DM[p, i, j] += sqrt((patts[p,k,i] - STS[k,j])**2)
     if metric == "squared":
         for p in prange(npatts):
             for i in prange(lpatts):
@@ -72,75 +71,55 @@ def compute_DM(
     # Return the DM
     return DM
 
-# Gramian Frames
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-# TODO implement gramian matrix
+@jit(nopython=True, parallel=True)
+def fill_dtw(DM: np.ndarray, w: float) -> None:
+    for p in prange(DM.shape[0]):
+        for i in range(1, DM.shape[1]):
+            for j in range(1, DM.shape[2]):
+                temp = w * np.minimum(DM[p, i, j-1], DM[p, i-1, j-1])
+                DM[p, i, j] += np.minimum(temp, DM[p, i-1, j])
 
 @jit(nopython=True, parallel=True)
-def compute_GM(
+def compute_pointwise_ED2(DM: np.ndarray, STS: np.ndarray, patts: np.ndarray) -> None:
+    for p in prange(DM.shape[0]):
+        for i in range(DM.shape[1]):
+            for j in range(DM.shape[2]):
+                DM[p, i, j] = np.sum(np.square(STS[:, j] - patts[p, :, i]))
+
+def compute_oDTW(
         STS: np.ndarray, 
         patts: np.ndarray, 
         rho: float, 
-        metric: str = "euclidean",
-        prev_col: Optional[np.ndarray] = None,
         ) -> np.ndarray:
     
-    if metric not in ["euclidean", "squared"]:
-        raise NotImplementedError
+    '''
+        STS has shape (c, n)
+        patts has shape (n_patts, c, m)
+        rho: weight of the o-DTW for the (-m)-th element in the STS
 
-    STS_len: int = STS.shape[1]
-    npatts: int = patts.shape[0]
-    dpatts: int = patts.shape[1]
+        returns: DM of shape (n_patts, m, n)
+    '''
+
+    assert STS.shape[0] == patts.shape[1]
+
     lpatts: int = patts.shape[2]
-    w: float = rho**(1/lpatts)
+    w: np.float32 = rho**(1/lpatts)
 
-    # Compute point-wise distance
-    DM = np.zeros((npatts, lpatts, STS_len), dtype=np.float32)
-    if metric == "euclidean":
-        for p in prange(npatts):
-            for i in prange(lpatts):
-                for j in prange(STS_len):
-                    for k in prange(dpatts):
-                        DM[p, i, j] += (patts[p,k,i] - STS[k,j])**2
-                    DM[p, i, j] = sqrt(DM[p, i, j])
-    if metric == "squared":
-        for p in prange(npatts):
-            for i in prange(lpatts):
-                for j in prange(STS_len):
-                    for k in range(dpatts):
-                        DM[p, i, j] += (patts[p,k,i] - STS[k,j])**2
+    DM = np.empty((patts.shape[0], patts.shape[-1], STS.shape[1]), dtype=np.float32)
 
-    # Compute the DM
-    if prev_col is None:
-        for p in prange(npatts):
-            # Solve first row
-            for j in range(1, STS_len):
-                DM[p,0,j] += w*DM[p,0,j-1]
-            # Solve first column
-            for i in range(1, lpatts):
-                DM[p,i,0] += DM[p,i-1,0]
-            # Solve the rest
-            for i in range(1, lpatts):
-                for j in range(1, STS_len):
-                    DM[p,i,j] += min([DM[p,i-1,j], w*DM[p,i-1,j-1], w*DM[p,i,j-1]])
-    else:
-        for p in prange(npatts):
-            # First first column
-            DM[p,0,0] += w*prev_col[p,0]
-            for i in range(1, lpatts):
-                DM[p,i,0] += min([
-                    DM[p,i-1,0], w*prev_col[p,i-1], w*prev_col[p,i]])
-            # Solve first row
-            for j in range(1, STS_len):
-                DM[p,0,j] += w*DM[p,0,j-1]
-            # Solve the rest
-            for i in range(1, lpatts):
-                for j in range(1, STS_len):
-                    DM[p,i,j] += min([
-                        DM[p,i-1,j], w*DM[p,i-1,j-1], w*DM[p,i,j-1]])
+    # Compute point-wise distances
+    compute_pointwise_ED2(DM, STS, patts)
+
+    np.cumsum(DM[:,0,:], axis=1, out=DM[:,0,:])
+    np.cumsum(DM[:,:,0], axis=1, out=DM[:,:,0])
+    
+    fill_dtw(DM, w)
 
     # Return the DM
-    return DM
+    return np.sqrt(DM)
+
+# Gramian Frames
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 # @jit(nopython=True, parallel=True)
 # def _minmax(X: np.ndarray):

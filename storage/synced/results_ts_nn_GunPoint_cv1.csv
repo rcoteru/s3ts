@@ -1,0 +1,2 @@
+mode,arch,dataset,window_length,pretrained,test_acc,test_f1,cv_rep,exc,train_exc_limit,train_strat_size,train_event_mult,nevents_test,nevents_train_lim,nevents_train_tot,time_dm,time_train,time_total
+ts,nn,GunPoint,150,False,0.5291969580220443,0.5291969580220443,1,32,32,2,4,200,256,256,20.262819411233068,783.5839327611029,803.846752172336
