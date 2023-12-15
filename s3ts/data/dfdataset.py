@@ -36,6 +36,7 @@ class DFDataset(Dataset):
         self.stsds = stsds
         self.ram = ram
         self.cached = cached
+        self.cache_dir = None
 
         if not patterns.flags.c_contiguous:
             patterns = patterns.copy(order="c")
@@ -48,7 +49,6 @@ class DFDataset(Dataset):
         self.DM = []
 
         if cached:
-            self.cache_dir = None
             hash = hashlib.sha1(patterns.data)
             self.cache_dir = os.path.join(os.getcwd(), "cache" + hash.hexdigest())
 
