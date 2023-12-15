@@ -29,7 +29,8 @@ def compute_medoids(
         dm = pairwise_distance(X_y, metric=metric)
         scores = dm.sum(axis=0)
         meds_idx_y = np.argpartition(scores, meds_per_class)[:meds_per_class]
-        meds[i,:,:] = X_y[meds_idx_y]
+        print(X_y[meds_idx_y].shape)
+        meds[i,:,:,:] = X_y[meds_idx_y]
         meds_idx[i,:] = index[meds_idx_y]
 
     # Return the medoids and their indices

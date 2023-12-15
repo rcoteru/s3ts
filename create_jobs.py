@@ -43,6 +43,7 @@ python training.py --dataset {dataset} --window_size {window_size*2 if mode=="dt
 --decoder_architecture {decoder} --decoder_features {decoder_features} --decoder_layers {DECODER_LAYERS} \\
 --mode {mode} \\
 --batch_size {batch_size} --lr {learning_rate} --num_workers 8
+--reduce_imbalance --normalize --label_mode 1 --num_medoids 1
 '''
 
 if __name__ == "__main__":

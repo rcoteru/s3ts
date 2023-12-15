@@ -11,12 +11,14 @@ def main(args):
         dm = load_dmdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
-            compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance)
+            compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
+            label_mode=args.label_mode, num_medoids=args.num_medoids)
     elif args.mode in ["ts", "dtw"]:
         dm = load_tsdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size,
-            subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance)
+            subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
+            label_mode=args.label_mode)
 
     modelname = f"model_{args.dataset}_{args.mode}_{args.encoder_architecture}{args.encoder_features}_" + \
                 f"{args.decoder_architecture}{args.decoder_features}_{args.decoder_layers}" + \
@@ -67,6 +69,10 @@ if __name__ == "__main__":
     parser.add_argument("--reduce_imbalance", action="store_true", 
         help="Wether to subsample imbalanced classes")
     parser.add_argument("--no-reduce_imbalance", dest="reduce_imbalance", action="store_false")
+    parser.add_argument("--label_mode", default=1, type=int,
+        help="Consider the mode (most common) label out of this number of labels for training (default 1), must be an odd number")
+    parser.add_argument("--num_medoids", default=1, type=int,
+        help="Number of medoids per class to use")
 
     args = parser.parse_args()
     

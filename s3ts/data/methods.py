@@ -31,7 +31,7 @@ def sts_medoids(dataset: STSDataset, n = 100, pattern_size = -1, meds_per_class 
         selected_w = selected_w[:,:,-pattern_size:]
     meds, meds_id = compute_medoids(selected_w, np.concatenate(selected_c, axis=0), meds_per_class=meds_per_class)
 
-    return meds[:,0,:,:]
+    return meds.reshape((meds.shape[0]*meds.shape[1], meds.shape[2], meds.shape[3]))
 
 
 def sts_barycenter(dataset: STSDataset, n: int = 100, random_seed: int = 45):

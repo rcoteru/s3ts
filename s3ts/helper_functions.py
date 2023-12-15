@@ -59,9 +59,11 @@ def load_dmdataset(
         pattern_size = None,
         compute_n = 500,
         subjects_for_test = None,
-        reduce_train_imbalance = False):
+        reduce_train_imbalance = False,
+        num_medoids = 1,
+        label_mode = 1):
     
-    assert pattern_size < window_size
+    assert pattern_size <= window_size
     
     ds = load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize)
         
@@ -78,8 +80,8 @@ def load_dmdataset(
     #     assert meds.shape[2] == pattern_size
 
     print("Computing medoids...")
-    meds = sts_medoids(ds, pattern_size=pattern_size, n=compute_n)
-    
+    meds = sts_medoids(ds, pattern_size=pattern_size, meds_per_class=num_medoids, n=compute_n)
+
     print("Computing dissimilarity frames...")
     dfds = DFDataset(ds, patterns=meds, w=0.1, dm_transform=None, cached=True, ram=False)
 
@@ -98,7 +100,7 @@ def load_dmdataset(
         dfds.dm_transform = dm_transform
 
     dm = LDFDataset(dfds, data_split=data_split, batch_size=batch_size, random_seed=42, 
-        num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance)
+        num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance, label_mode=label_mode)
 
     print(f"Using {len(dm.ds_train)} observations for training and {len(dm.ds_val)} observations for validation and test")
 

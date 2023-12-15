@@ -111,7 +111,7 @@ class DFDataset(Dataset):
         if not self.dm_transform is None:
             dm = self.dm_transform(dm)
 
-        ts, c = self.stsds[id]
+        ts, c = self.stsds[index]
 
         return (dm, ts, c)
 
