@@ -112,7 +112,8 @@ class WrapperModel(LightningModule):
             for phase in ["train", "val", "test"]: 
                 self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=out_feats, task="multiclass", average="macro"))
                 self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=out_feats, task="multiclass", average="macro"))
-                self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=out_feats, task="multiclass", average="macro"))
+                if phase != "train":
+                    self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=out_feats, task="multiclass", average="macro"))
         elif self.task == "reg":
             for phase in ["train", "val", "test"]:
                 self.__setattr__(f"{phase}_mse", tm.MeanSquaredError(squared=False))
@@ -156,8 +157,9 @@ class WrapperModel(LightningModule):
             #                             num_classes=self.n_classes)
             loss = F.cross_entropy(output, batch["label"])
             acc = self.__getattr__(f"{stage}_acc")(output, batch["label"])
-            f1  = self.__getattr__(f"{stage}_f1")(output, batch["label"])
-            auroc = self.__getattr__(f"{stage}_auroc")(output, batch["label"])  
+            f1 = self.__getattr__(f"{stage}_f1")(output, batch["label"])
+            if stage != "train":
+                auroc = self.__getattr__(f"{stage}_auroc")(output, batch["label"])  
         elif self.task == "reg":
             loss = F.mse_loss(output, batch["series"])
             mse = self.__getattr__(f"{stage}_mse")(output, batch["series"])
@@ -168,9 +170,10 @@ class WrapperModel(LightningModule):
         on_step = True if stage == "train" else False
         self.log(f"{stage}_loss", loss, on_epoch=True, on_step=on_step, prog_bar=True, logger=True)
         if self.task == "cls":
-            self.log(f"{stage}_acc", acc, on_epoch=True, on_step=False, prog_bar=True, logger=True)
-            self.log(f"{stage}_f1", f1, on_epoch=True, on_step=False, prog_bar=False, logger=True)
-            self.log(f"{stage}_auroc", self.__getattr__(f"{stage}_auroc").compute(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
+            self.log(f"{stage}_acc", self.__getattr__(f"{stage}_acc"), on_epoch=True, on_step=False, prog_bar=True, logger=True)
+            self.log(f"{stage}_f1", self.__getattr__(f"{stage}_f1"), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+            if stage != "train":
+                self.log(f"{stage}_auroc", self.__getattr__(f"{stage}_auroc"), on_epoch=True, on_step=False, prog_bar=True, logger=True)
         elif self.task == "reg":
             self.log(f"{stage}_mse", mse, on_epoch=True, on_step=False, prog_bar=True, logger=True)
             self.log(f"{stage}_r2", r2, on_epoch=True, on_step=False, prog_bar=True, logger=True)
