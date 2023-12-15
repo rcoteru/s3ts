@@ -111,17 +111,20 @@ class DFDataset(Dataset):
         if not self.dm_transform is None:
             dm = self.dm_transform(dm)
 
-        return (dm, 
-                self.stsds.STS[:, first:last:self.stsds.wstride], 
-                self.stsds.SCS[id])
+        ts, c = self.stsds[id]
+
+        return (dm, ts, c)
 
 class DFDatasetCopy(Dataset):
     def __init__(self,
-            dfds: DFDataset, indices: np.ndarray) -> None:
+            dfds: DFDataset, indices: np.ndarray, label_mode: int = 1) -> None:
         super().__init__()
+
+        assert label_mode%2==1
 
         self.dfds = dfds
         self.indices = indices
+        self.label_mode = label_mode
         
     def __len__(self):
         return self.indices.shape[0]
@@ -129,6 +132,12 @@ class DFDatasetCopy(Dataset):
     def __getitem__(self, index) -> tuple[torch.Tensor, torch.Tensor, int]:
 
         df, ts, c = self.dfds[self.indices[index]]
+
+        if self.label_mode > 1:
+            c = torch.mode(c[-self.label_mode:]).values
+        else:
+            c = c[-1]
+
         return {"frame": df, "series": ts, "label": c}
     
     def __del__(self):
@@ -151,7 +160,8 @@ class LDFDataset(StreamingFramesDM):
             data_split: dict, batch_size: int, 
             random_seed: int = 42, 
             num_workers: int = mp.cpu_count()//2,
-            reduce_train_imbalance: bool = False
+            reduce_train_imbalance: bool = False,
+            label_mode: int = 1
             ) -> None:
 
         '''
@@ -197,9 +207,9 @@ class LDFDataset(StreamingFramesDM):
         if reduce_train_imbalance:
             train_indices = reduce_imbalance(train_indices, self.dfds.stsds.SCS[self.dfds.stsds.indices[train_indices]], seed=random_seed)
 
-        self.ds_train = DFDatasetCopy(self.dfds, train_indices)
-        self.ds_test = DFDatasetCopy(self.dfds, test_indices)
-        self.ds_val = DFDatasetCopy(self.dfds, val_indices)
+        self.ds_train = DFDatasetCopy(self.dfds, train_indices, label_mode)
+        self.ds_test = DFDatasetCopy(self.dfds, test_indices, label_mode)
+        self.ds_val = DFDatasetCopy(self.dfds, val_indices, label_mode)
         
     def train_dataloader(self) -> DataLoader:
         """ Returns the training DataLoader. """

@@ -41,12 +41,15 @@ class StreamingTimeSeries(STSDataset):
 class StreamingTimeSeriesCopy(Dataset):
 
     def __init__(self,
-            stsds: StreamingTimeSeries, indices: np.ndarray
+            stsds: StreamingTimeSeries, indices: np.ndarray, label_mode: int = 1
             ) -> None:
         super().__init__()
 
+        assert label_mode%2==1
+
         self.stsds = stsds
         self.indices = indices
+        self.label_mode = label_mode
         
     def __len__(self):
         return self.indices.shape[0]
@@ -54,7 +57,13 @@ class StreamingTimeSeriesCopy(Dataset):
     def __getitem__(self, index) -> tuple[torch.Tensor, torch.Tensor, int]:
 
         ts, c = self.stsds[self.indices[index]]
-        return {"series": ts, "label": c[-1]}
+
+        if self.label_mode > 1:
+            c = torch.mode(c[-self.label_mode:]).values
+        else:
+            c = c[-1]
+
+        return {"series": ts, "label": c}
     
     def __del__(self):
         del self.stsds
@@ -77,7 +86,8 @@ class LSTSDataset(LightningDataModule):
             data_split: dict, batch_size: int, 
             random_seed: int = 42, 
             num_workers: int = 1,
-            reduce_train_imbalance: bool = False
+            reduce_train_imbalance: bool = False,
+            label_mode: int = 1
             ) -> None:
 
         # save parameters as attributes
@@ -113,9 +123,9 @@ class LSTSDataset(LightningDataModule):
         if reduce_train_imbalance:
             train_indices = reduce_imbalance(train_indices, self.stsds.SCS[self.stsds.indices[train_indices]], seed=random_seed)
 
-        self.ds_train = StreamingTimeSeriesCopy(self.stsds, train_indices)
-        self.ds_test = StreamingTimeSeriesCopy(self.stsds, test_indices)
-        self.ds_val = StreamingTimeSeriesCopy(self.stsds, val_indices)
+        self.ds_train = StreamingTimeSeriesCopy(self.stsds, train_indices, label_mode)
+        self.ds_test = StreamingTimeSeriesCopy(self.stsds, test_indices, label_mode)
+        self.ds_val = StreamingTimeSeriesCopy(self.stsds, val_indices, label_mode)
         
     def train_dataloader(self) -> DataLoader:
         """ Returns the training DataLoader. """

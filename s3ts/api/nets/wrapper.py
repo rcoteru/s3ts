@@ -110,9 +110,9 @@ class WrapperModel(LightningModule):
         # create metrics
         if self.task == "cls":
             for phase in ["train", "val", "test"]: 
-                self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=out_feats, task="multiclass"))
-                self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=out_feats, task="multiclass"))
-                self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=out_feats, task="multiclass"))
+                self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=out_feats, task="multiclass", average="macro"))
+                self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=out_feats, task="multiclass", average="macro"))
+                self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=out_feats, task="multiclass", average="macro"))
         elif self.task == "reg":
             for phase in ["train", "val", "test"]:
                 self.__setattr__(f"{phase}_mse", tm.MeanSquaredError(squared=False))
@@ -170,7 +170,7 @@ class WrapperModel(LightningModule):
         if self.task == "cls":
             self.log(f"{stage}_acc", acc, on_epoch=True, on_step=False, prog_bar=True, logger=True)
             self.log(f"{stage}_f1", f1, on_epoch=True, on_step=False, prog_bar=False, logger=True)
-            self.log(f"{stage}_auroc", auroc, on_epoch=True, on_step=False, prog_bar=True, logger=True)
+            self.log(f"{stage}_auroc", self.__getattr__(f"{stage}_auroc").compute(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
         elif self.task == "reg":
             self.log(f"{stage}_mse", mse, on_epoch=True, on_step=False, prog_bar=True, logger=True)
             self.log(f"{stage}_r2", r2, on_epoch=True, on_step=False, prog_bar=True, logger=True)
