@@ -13,7 +13,9 @@ from s3ts.api.nets.encoders.series.RNN import RNN_TS
 from s3ts.api.nets.encoders.series.CNN import CNN_TS
 from s3ts.api.nets.encoders.series.RES import RES_TS
 from s3ts.api.nets.encoders.frames.simpleCNN import SimpleCNN_IMG
+from s3ts.api.nets.encoders.frames.CNN_GAP import CNN_GAP_IMG
 from s3ts.api.nets.encoders.series.simpleCNN import SimpleCNN_TS
+from s3ts.api.nets.encoders.series.CNN_GAP import CNN_GAP_TS
 from s3ts.api.nets.decoders.linear import LinearDecoder
 from s3ts.api.nets.decoders.mlp import MultiLayerPerceptron
 
@@ -27,9 +29,9 @@ import torch.nn as nn
 import numpy as np
 import torch
 
-encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG},
-    "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS, "simplecnn": SimpleCNN_TS},
-    "dtw": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG}}
+encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG},
+    "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS, "simplecnn": SimpleCNN_TS, "cnn_gap": CNN_GAP_TS},
+    "dtw": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_TS}}
 
 decoder_dict = {"linear": LinearDecoder, "mlp": MultiLayerPerceptron}
 
@@ -160,7 +162,7 @@ class WrapperModel(LightningModule):
             loss = F.cross_entropy(output, batch["label"])
 
             predictions = torch.argmax(output, dim=1)
-            if not self.voting is None:
+            if stage != "train" and not self.voting is None:
                 predictions_one_hot = torch.eye(self.n_classes)[predictions] # equivalent to F.one_hot(predictions, self.n_classes).float()
                 predictions_weighted = torch.conv2d(
                     F.pad(predictions_one_hot[None, None, ...], (0, 0, self.voting["n"]-1, 0)),
