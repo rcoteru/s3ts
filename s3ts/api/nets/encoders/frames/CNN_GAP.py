@@ -27,7 +27,7 @@ class CNN_GAP_IMG(torch.nn.Module):
         
         # convolutional layer 2
         self.cnn_2 = nn.Sequential(nn.Conv2d(in_channels=self.n_feature_maps, 
-            out_channels=self.n_feature_maps*2, kernel_size=3, padding='same'),
+            out_channels=self.n_feature_maps*2, kernel_size=3, padding='valid'),
             nn.BatchNorm2d(num_features=self.n_feature_maps*2),
             nn.ReLU())
         
