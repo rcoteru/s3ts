@@ -23,7 +23,7 @@ class DFDataset(Dataset):
     def __init__(self, 
             stsds: STSDataset = None,
             patterns: np.ndarray = None,
-            w: float = 0.1,
+            rho: float = 0.1,
             dm_transform = None,
             ram: bool = False,
             cached: bool = True) -> None:
@@ -44,7 +44,7 @@ class DFDataset(Dataset):
         self.patterns = patterns
         self.dm_transform = dm_transform
 
-        self.rho = w
+        self.rho = rho
 
         self.DM = []
 

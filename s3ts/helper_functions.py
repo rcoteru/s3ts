@@ -51,6 +51,7 @@ def load_dataset(dataset_name, dataset_home_directory, window_size, window_strid
 def load_dmdataset(
         dataset_name,
         dataset_home_directory = None,
+        rho = 0.1,
         batch_size = 16,
         num_workers = 1,
         window_size = 32,
@@ -83,7 +84,7 @@ def load_dmdataset(
     meds = sts_medoids(ds, pattern_size=pattern_size, meds_per_class=num_medoids, n=compute_n)
 
     print("Computing dissimilarity frames...")
-    dfds = DFDataset(ds, patterns=meds, w=0.1, dm_transform=None, cached=True, ram=False)
+    dfds = DFDataset(ds, patterns=meds, rho=rho, dm_transform=None, cached=True, ram=False)
 
     data_split = split_by_test_subject(ds, subjects_for_test)
 

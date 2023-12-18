@@ -9,25 +9,28 @@ def main(args):
 
     if args.mode == "img":
         dm = load_dmdataset(
-            args.dataset, dataset_home_directory=args.dataset_dir, batch_size=args.batch_size, num_workers=args.num_workers, 
+            args.dataset, dataset_home_directory=args.dataset_dir, 
+            rho=args.rho, batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
             compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
             label_mode=args.label_mode, num_medoids=args.num_medoids)
     elif args.mode in ["ts", "dtw"]:
         dm = load_tsdataset(
-            args.dataset, dataset_home_directory=args.dataset_dir, batch_size=args.batch_size, num_workers=args.num_workers, 
+            args.dataset, dataset_home_directory=args.dataset_dir, 
+            batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size,
             subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
             label_mode=args.label_mode)
 
-    modelname = f"model_{args.dataset}_{args.mode}_{args.encoder_architecture}{args.encoder_features}_" + \
+    modelname = f"model_{args.dataset}_{args.mode}_rho{args.rho}_{args.encoder_architecture}{args.encoder_features}_" + \
                 f"{args.decoder_architecture}{args.decoder_features}_{args.decoder_layers}" + \
                 f"_lr{args.lr}_wsize{args.window_size}_wstride{args.window_stride}_bs{args.batch_size}"
 
     model = create_model_from_DM(dm, name=modelname, 
         dsrc=args.mode, arch=args.encoder_architecture, dec_arch=args.decoder_architecture,
         task="cls", lr=args.lr, enc_feats=args.encoder_features, 
-        dec_feats=args.decoder_features, dec_layers=args.decoder_layers)
+        dec_feats=args.decoder_features, dec_layers=args.decoder_layers,
+        voting={"n": args.voting, "rho": args.rho})
     
     model, data = train_model(dm, model, max_epochs=args.max_epochs)
     print(data)
@@ -73,6 +76,10 @@ if __name__ == "__main__":
         help="Consider the mode (most common) label out of this number of labels for training (default 1), must be an odd number")
     parser.add_argument("--num_medoids", default=1, type=int,
         help="Number of medoids per class to use")
+    parser.add_argument("--voting", default=1, type=int,
+        help="Number of previous predictions to consider in the vote of the next prediction, defaults to 1 (no voting)")
+    parser.add_argument("--rho", default=0.1, type=float,
+        help="Parameter of the online-dtw algorithm, the window_size-th root is used as the voting parameter")
 
     args = parser.parse_args()
     

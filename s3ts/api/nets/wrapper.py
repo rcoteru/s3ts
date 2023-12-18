@@ -83,7 +83,7 @@ class WrapperModel(LightningModule):
         elif dsrc == "ts":
             ref_size, channels = 1, self.n_dims
         elif dsrc == "dtw":
-            self.dtw_layer = DTWLayer(n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=l_patterns, rho=0.01)
+            self.dtw_layer = DTWLayer(n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=l_patterns, rho=self.voting["rho"]/10)
             ref_size, channels = l_patterns, enc_feats
             self.wdw_len = ref_size
 
@@ -121,7 +121,7 @@ class WrapperModel(LightningModule):
         self.voting = None
         if voting["n"] > 1:
             self.voting = voting
-            self.voting["weights"] = self.voting["w"] ** torch.arange(self.voting["n"], 0, -1)
+            self.voting["weights"] = (self.voting["rho"] ** (1/self.wdw_len)) ** torch.arange(self.voting["n"], 0, -1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward pass. """
