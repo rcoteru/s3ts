@@ -221,9 +221,9 @@ class WrapperModel(LightningModule):
         recall = TP/(TP+FN) # this is the same as accuracy per class
         f1 = 2*(precision*recall)/(precision + recall)
 
-        self.log(f"{stage}_pr", precision.mean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
-        self.log(f"{stage}_re", recall.mean(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
-        self.log(f"{stage}_f1", f1.mean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+        self.log(f"{stage}_pr", precision.nanmean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+        self.log(f"{stage}_re", recall.nanmean(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
+        self.log(f"{stage}_f1", f1.nanmean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
 
     def on_train_epoch_end(self):
         self.log_metrics("train")
