@@ -46,7 +46,7 @@ python training.py --dataset {dataset} --window_size {window_size*2 if mode=="dt
 --subjects_for_test {" ".join([str(subject) for subject in subjects_for_test])} \\
 --encoder_architecture {encoder} --encoder_features {encoder_features} \\
 --decoder_architecture {decoder} --decoder_features {decoder_features} --decoder_layers {DECODER_LAYERS} \\
---mode {mode} --max_epochs {EPOCHS}\\
+--mode {mode} --max_epochs {EPOCHS} \\
 --batch_size {batch_size} --lr {learning_rate} --num_workers 8 \\
 --reduce_imbalance --normalize --label_mode {LABEL_MODE} --num_medoids {MEDOIDS_PER_CLASS} --compute_n {MEDOIDS_N} \\
 --rho {RHO} --voting {VOTING}
