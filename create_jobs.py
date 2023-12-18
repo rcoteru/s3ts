@@ -1,20 +1,25 @@
 import os
 
-dataset = "WISDM"
-subjects_for_test = [30, 31, 32, 33, 34, 35]
-epochs = 10
+dataset = "HARTH"
+subjects_for_test = [21]
+EPOCHS = 30
+RHO = 0.1
 
 BATCH_SIZES = [128]
-LEARNING_RATES = [1e-4]
-ENCODERS = ["simplecnn"]
-ENCODER_FEATURES = [4]
+LEARNING_RATES = [1e-3]
+ENCODERS = ["cnn_gap"]
+ENCODER_FEATURES = [20]
 DECODERS = ["mlp"]
-MODES = ["dtw", "img", "ts"]
-DECODER_FEATURES = [16]
-WINDOW_SIZES = [20]
+MODES = ["img", "ts"]
+DECODER_FEATURES = [32]
+WINDOW_SIZES = [48]
 WINDOW_STRIDES = [1, 2]
 DECODER_LAYERS = 1
 RAM = 32
+VOTING = 1
+LABEL_MODE = 1
+MEDOIDS_PER_CLASS = 1
+MEDOIDS_N = 300
 
 def create_jobs(mode, batch_size, window_size, window_stride, learning_rate, encoder, encoder_features, decoder, decoder_features):
 
@@ -41,9 +46,10 @@ python training.py --dataset {dataset} --window_size {window_size*2 if mode=="dt
 --subjects_for_test {" ".join([str(subject) for subject in subjects_for_test])} \\
 --encoder_architecture {encoder} --encoder_features {encoder_features} \\
 --decoder_architecture {decoder} --decoder_features {decoder_features} --decoder_layers {DECODER_LAYERS} \\
---mode {mode} \\
---batch_size {batch_size} --lr {learning_rate} --num_workers 8
---reduce_imbalance --normalize --label_mode 1 --num_medoids 1
+--mode {mode} --max_epochs {EPOCHS}\\
+--batch_size {batch_size} --lr {learning_rate} --num_workers 8 \\
+--reduce_imbalance --normalize --label_mode {LABEL_MODE} --num_medoids {MEDOIDS_PER_CLASS} --compute_n {MEDOIDS_N} \\
+--rho {RHO} --voting {VOTING}
 '''
 
 if __name__ == "__main__":
