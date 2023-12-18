@@ -110,8 +110,7 @@ class WrapperModel(LightningModule):
         # create metrics
         if self.task == "cls":
             for phase in ["train", "val", "test"]: 
-                self.__setattr__(f"{phase}_acc", tm.Accuracy(num_classes=out_feats, task="multiclass", average="macro"))
-                self.__setattr__(f"{phase}_f1",  tm.F1Score(num_classes=out_feats, task="multiclass", average="macro"))
+                self.__setattr__(f"{phase}_cm", tm.ConfusionMatrix(num_classes=out_feats, task="multiclass"))
                 if phase != "train":
                     self.__setattr__(f"{phase}_auroc", tm.AUROC(num_classes=out_feats, task="multiclass", average="macro"))
         elif self.task == "reg":
@@ -153,11 +152,9 @@ class WrapperModel(LightningModule):
 
         # Compute the loss and metrics
         if self.task == "cls":
-            # oh_label: torch.Tensor = F.one_hot(batch["label"], 
-            #                             num_classes=self.n_classes)
             loss = F.cross_entropy(output, batch["label"])
-            acc = self.__getattr__(f"{stage}_acc")(output, batch["label"])
-            f1 = self.__getattr__(f"{stage}_f1")(output, batch["label"])
+            predictions = torch.argmax(output, dim=1)
+            self.__getattr__(f"{stage}_cm").update(predictions, batch["label"])
             if stage != "train":
                 auroc = self.__getattr__(f"{stage}_auroc")(output, batch["label"])  
         elif self.task == "reg":
@@ -170,8 +167,8 @@ class WrapperModel(LightningModule):
         on_step = True if stage == "train" else False
         self.log(f"{stage}_loss", loss, on_epoch=True, on_step=on_step, prog_bar=True, logger=True)
         if self.task == "cls":
-            self.log(f"{stage}_acc", self.__getattr__(f"{stage}_acc"), on_epoch=True, on_step=False, prog_bar=True, logger=True)
-            self.log(f"{stage}_f1", self.__getattr__(f"{stage}_f1"), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+            #self.log(f"{stage}_acc", self.__getattr__(f"{stage}_acc"), on_epoch=True, on_step=False, prog_bar=True, logger=True)
+            #self.log(f"{stage}_f1", self.__getattr__(f"{stage}_f1"), on_epoch=True, on_step=False, prog_bar=False, logger=True)
             if stage != "train":
                 self.log(f"{stage}_auroc", self.__getattr__(f"{stage}_auroc"), on_epoch=True, on_step=False, prog_bar=True, logger=True)
         elif self.task == "reg":
@@ -192,6 +189,34 @@ class WrapperModel(LightningModule):
     def test_step(self, batch: dict[str: torch.Tensor], batch_idx: int):
         """ Validation step. """
         return self._inner_step(batch, stage="test")
+    
+    def log_metrics(self, stage):
+        cm = self.__getattr__(f"{stage}_cm").compute()
+        self.__getattr__(f"{stage}_cm").reset()
+
+        TP = cm.diag()
+        FP = cm.sum(0) - TP
+        FN = cm.sum(1) - TP
+        TN = torch.empty(cm.shape[0])
+        for i in range(cm.shape[0]):
+            TN[i] = cm[:i,:i].sum() + cm[:i,i:].sum() + cm[i:,:i].sum() + cm[i:,i:].sum()
+
+        precision = TP/(TP+FP)
+        recall = TP/(TP+FN) # this is the same as accuracy per class
+        f1 = 2*(precision*recall)/(precision + recall)
+
+        self.log(f"{stage}_pr", precision.mean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+        self.log(f"{stage}_re", recall.mean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+        self.log(f"{stage}_f1", f1.mean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+
+    def on_train_epoch_end(self):
+        self.log_metrics("train")
+
+    def on_validation_epoch_end(self):
+        self.log_metrics("val")
+
+    def on_test_epoch_end(self):
+        self.log_metrics("test")
 
     def predict_step(self, batch: dict[str: torch.Tensor], batch_idx: int):
         """ Predict step. """
@@ -204,7 +229,7 @@ class WrapperModel(LightningModule):
     def configure_optimizers(self):
         """ Configure the optimizers. """
         mode = "max" if self.task == "cls" else "min"
-        monitor = "val_acc" if self.task == "cls" else "val_mse"
+        monitor = "val_re" if self.task == "cls" else "val_mse"
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return {
             "optimizer": optimizer,
