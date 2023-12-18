@@ -56,7 +56,7 @@ class WrapperModel(LightningModule):
     def __init__(self, dsrc, arch, dec_arch, task,
         n_dims, n_classes, n_patterns, l_patterns,
         wdw_len, wdw_str, sts_str,
-        enc_feats, dec_feats, dec_layers, lr,
+        enc_feats, dec_feats, dec_layers, lr, voting,
         name=None) -> None:
 
         """ Wrapper for the PyTorch models used in the experiments. """
@@ -118,6 +118,11 @@ class WrapperModel(LightningModule):
                 self.__setattr__(f"{phase}_mse", tm.MeanSquaredError(squared=False))
                 self.__setattr__(f"{phase}_r2",  tm.R2Score(num_outputs=out_feats))
 
+        self.voting = None
+        if voting["n"] > 1:
+            self.voting = voting
+            self.voting["weights"] = self.voting["w"] ** torch.arange(self.voting["n"], 0, -1)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward pass. """
         if self.dsrc == "dtw":
@@ -153,7 +158,16 @@ class WrapperModel(LightningModule):
         # Compute the loss and metrics
         if self.task == "cls":
             loss = F.cross_entropy(output, batch["label"])
+
             predictions = torch.argmax(output, dim=1)
+            if not self.voting is None:
+                predictions_one_hot = torch.eye(self.n_classes)[predictions] # equivalent to F.one_hot(predictions, self.n_classes).float()
+                predictions_weighted = torch.conv2d(
+                    F.pad(predictions_one_hot[None, None, ...], (0, 0, self.voting["n"]-1, 0)),
+                    self.voting["weights"][None, None, :, None]
+                )[0, 0]
+                predictions = torch.argmax(predictions_weighted, dim=1)
+
             self.__getattr__(f"{stage}_cm").update(predictions, batch["label"])
             if stage != "train":
                 auroc = self.__getattr__(f"{stage}_auroc")(output, batch["label"])  
@@ -206,7 +220,7 @@ class WrapperModel(LightningModule):
         f1 = 2*(precision*recall)/(precision + recall)
 
         self.log(f"{stage}_pr", precision.mean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
-        self.log(f"{stage}_re", recall.mean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+        self.log(f"{stage}_re", recall.mean(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
         self.log(f"{stage}_f1", f1.mean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
 
     def on_train_epoch_end(self):

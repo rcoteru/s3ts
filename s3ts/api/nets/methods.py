@@ -36,13 +36,15 @@ default_enc_feats: dict[dict[int]] = {
 # metrics settings
 metric_settings: dict = {
     "reg": {"all": ["mse", "r2"], "target": "val_mse", "mode": "min"},
-    "cls": {"all": ["acc", "f1", "auroc"], "target": "val_acc", "mode": "max"}
+    "cls": {"all": ["re", "f1", "auroc"], "target": "val_re", "mode": "max"}
 }
+
+default_voting = {"n": 1, "w": 1}
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def create_model_from_DM(dm:  StreamingFramesDM, dsrc: str, arch: str, dec_arch: str, task: str, name: str = None,
-        enc_feats: int = None, dec_feats: int = None, dec_layers: int = None, lr: float = default_lr
+        enc_feats: int = None, dec_feats: int = None, dec_layers: int = None, lr: float = default_lr, voting: dict = default_voting
         ) -> WrapperModel:
     
     # use defaults values if needed
@@ -68,7 +70,8 @@ def create_model_from_DM(dm:  StreamingFramesDM, dsrc: str, arch: str, dec_arch:
         enc_feats=enc_feats,
         dec_feats=dec_feats,
         dec_layers=dec_layers,
-        lr=lr)
+        lr=lr,
+        voting=voting)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
