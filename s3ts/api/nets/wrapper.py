@@ -14,8 +14,10 @@ from s3ts.api.nets.encoders.series.CNN import CNN_TS
 from s3ts.api.nets.encoders.series.RES import RES_TS
 from s3ts.api.nets.encoders.frames.simpleCNN import SimpleCNN_IMG
 from s3ts.api.nets.encoders.frames.CNN_GAP import CNN_GAP_IMG
+from s3ts.api.nets.encoders.frames.RES_GAP import RES_GAP_IMG
 from s3ts.api.nets.encoders.series.simpleCNN import SimpleCNN_TS
 from s3ts.api.nets.encoders.series.CNN_GAP import CNN_GAP_TS
+from s3ts.api.nets.encoders.series.RES_GAP import RES_GAP_TS
 from s3ts.api.nets.decoders.linear import LinearDecoder
 from s3ts.api.nets.decoders.mlp import MultiLayerPerceptron
 
@@ -29,9 +31,9 @@ import torch.nn as nn
 import numpy as np
 import torch
 
-encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG},
-    "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS, "simplecnn": SimpleCNN_TS, "cnn_gap": CNN_GAP_TS},
-    "dtw": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_TS}}
+encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG, "res_gap": RES_GAP_IMG},
+    "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS, "simplecnn": SimpleCNN_TS, "cnn_gap": CNN_GAP_TS, "res_gap": RES_GAP_TS},
+    "dtw": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG, "res_gap": RES_GAP_IMG}}
 
 decoder_dict = {"linear": LinearDecoder, "mlp": MultiLayerPerceptron}
 
@@ -85,7 +87,7 @@ class WrapperModel(LightningModule):
         elif dsrc == "ts":
             ref_size, channels = 1, self.n_dims
         elif dsrc == "dtw":
-            self.dtw_layer = DTWLayer(n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=l_patterns, rho=self.voting["rho"]/10)
+            self.dtw_layer = DTWLayer(n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=wdw_len, rho=self.voting["rho"]/10)
             ref_size, channels = l_patterns, enc_feats
             self.wdw_len = ref_size
 
