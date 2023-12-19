@@ -8,7 +8,7 @@ RHO = 0.1
 BATCH_SIZES = [128]
 LEARNING_RATES = [1e-3]
 ENCODERS = ["cnn_gap"]
-ENCODER_FEATURES = [20]
+ENCODER_FEATURES = [32]
 DECODERS = ["mlp"]
 MODES = ["img", "ts"]
 DECODER_FEATURES = [32]
@@ -31,7 +31,7 @@ def create_jobs(mode, batch_size, window_size, window_stride, learning_rate, enc
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem={RAM}GB
-#SBATCH --time=10:00:00
+#SBATCH --time=1-00:00:00
 #SBATCH --job-name={jobname}
 #SBATCH --output=R-%x.%j.out
 #SBATCH --error=R-%x.%j.err
