@@ -98,7 +98,6 @@ class STSDataset(Dataset):
     
     def normalizeSTS(self, mode):
         self.mean = np.expand_dims(self.STS.mean(1), 1)
-        self.percentile1 = np.expand_dims(np.percentile(self.STS, 1, axis=1), 1)
-        self.percentile99 = np.expand_dims(np.percentile(self.STS, 99, axis=1), 1)
+        self.std = np.expand_dims(np.std(self.STS, axis=1), 1)
 
-        self.STS = (self.STS - self.mean) / (self.percentile99 - self.percentile1)
+        self.STS = (self.STS - self.mean) / self.std
