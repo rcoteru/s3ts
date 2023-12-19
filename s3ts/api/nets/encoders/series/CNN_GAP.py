@@ -19,13 +19,13 @@ class CNN_GAP_TS(torch.nn.Module):
             nn.ReLU())
         
         # convolutional layer 1
-        self.cnn_1 = nn.Sequential(nn.Conv1d(in_channels=self.n_feature_maps//2, 
+        self.cnn_1 = nn.Sequential(nn.Conv1d(in_channels=self.n_feature_maps, 
             out_channels=self.n_feature_maps*2, kernel_size=5, padding='same'),
             nn.BatchNorm1d(num_features=self.n_feature_maps*2),
             nn.ReLU())
         
         # convolutional layer 2
-        self.cnn_2 = nn.Sequential(nn.Conv1d(in_channels=self.n_feature_maps, 
+        self.cnn_2 = nn.Sequential(nn.Conv1d(in_channels=self.n_feature_maps*2, 
             out_channels=self.n_feature_maps, kernel_size=3, padding='valid'),
             nn.BatchNorm1d(num_features=self.n_feature_maps),
             nn.ReLU())
