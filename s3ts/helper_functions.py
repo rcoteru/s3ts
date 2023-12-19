@@ -62,7 +62,8 @@ def load_dmdataset(
         subjects_for_test = None,
         reduce_train_imbalance = False,
         num_medoids = 1,
-        label_mode = 1):
+        label_mode = 1,
+        use_medoids = True):
     
     assert pattern_size <= window_size
     
@@ -80,8 +81,15 @@ def load_dmdataset(
     #     meds = np.load(os.path.join(dataset_home_directory, dataset_name, f"meds{window_size}.npz"))
     #     assert meds.shape[2] == pattern_size
 
-    print("Computing medoids...")
-    meds = sts_medoids(ds, pattern_size=pattern_size, meds_per_class=num_medoids, n=compute_n)
+    if use_medoids:
+        print("Computing medoids...")
+        meds = sts_medoids(ds, pattern_size=pattern_size, meds_per_class=num_medoids, n=compute_n)
+    else:
+        print("Using synthetic shapes...")
+        meds = np.empty((3, window_size))
+        meds[0,:] = np.linspace(-1, 1, window_size)
+        meds[1,:] = np.linspace(1, -1, window_size)
+        meds[2,:] = 0
 
     print("Computing dissimilarity frames...")
     dfds = DFDataset(ds, patterns=meds, rho=rho, dm_transform=None, cached=True, ram=False)

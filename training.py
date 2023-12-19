@@ -13,7 +13,7 @@ def main(args):
             rho=args.rho, batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
             compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
-            label_mode=args.label_mode, num_medoids=args.num_medoids)
+            label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids)
     elif args.mode in ["ts", "dtw"]:
         dm = load_tsdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, 
@@ -50,7 +50,6 @@ if __name__ == "__main__":
         help="Stride used when extracting windows")
     parser.add_argument("--normalize", action="store_true", 
         help="Wether to normalize the dissimilarity frames and STS")
-    parser.add_argument("--no-normalize", dest="normalize", action="store_false")
     parser.add_argument("--pattern_size", default=32, type=int, 
         help="Size of the pattern for computation of dissimilarity frames (not used)")
     parser.add_argument("--compute_n", default=500, type=int, 
@@ -80,6 +79,10 @@ if __name__ == "__main__":
         help="Number of previous predictions to consider in the vote of the next prediction, defaults to 1 (no voting)")
     parser.add_argument("--rho", default=0.1, type=float,
         help="Parameter of the online-dtw algorithm, the window_size-th root is used as the voting parameter")
+    parser.add_argument("--use_medoids", action="store_true", default=True,
+        help="Use medoids for DM computation")
+    parser.add_argument("--use_synthetic", action="store_false", dest="use_medoids", 
+        help="Use synthetic shapes for DM computation")
 
     args = parser.parse_args()
     

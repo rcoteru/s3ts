@@ -4,7 +4,7 @@ import os
 
 from torch.utils.data import Dataset, DataLoader
 from s3ts.data.base import StreamingFramesDM
-from s3ts.api.encodings import compute_DM, compute_oDTW
+from s3ts.api.encodings import compute_DM, compute_oDTW, compute_oDTW_channel
 import torchvision as tv
 import torch
 
@@ -44,6 +44,8 @@ class DFDataset(Dataset):
         self.patterns = patterns
         self.dm_transform = dm_transform
 
+        self.n_patterns = self.patterns.shape[0] if len(self.patterns.shape) == 3 else self.patterns.shape[0] * self.stsds.STS.shape[0]
+
         self.rho = rho
 
         self.DM = []
@@ -80,7 +82,10 @@ class DFDataset(Dataset):
             os.rmdir(self.cache_dir)
 
     def _compute_dm(self, pattern, split, save_path):
-        DM = compute_oDTW(self.stsds.STS[:, split[0]:split[1]], pattern, rho=self.rho)
+        if len(pattern.shape) == 3:
+            DM = compute_oDTW(self.stsds.STS[:, split[0]:split[1]], pattern, rho=self.rho)
+        elif len(pattern.shape) == 2:
+            DM = compute_oDTW_channel(self.stsds.STS[:, split[0]:split[1]], pattern, rho=self.rho)
 
         # put time dimension in the first dimension
         DM = np.ascontiguousarray(np.transpose(DM, (2, 0, 1)))
@@ -188,10 +193,10 @@ class LDFDataset(StreamingFramesDM):
         self.sts_str = False
 
         # gather dataset info   
-        self.n_dims = self.dfds.stsds.STS.shape[1]
+        self.n_dims = self.dfds.stsds.STS.shape[0]
         self.n_classes = len(np.unique(self.dfds.stsds.SCS))
-        self.n_patterns = self.dfds.patterns.shape[0]
-        self.l_patterns = self.dfds.patterns.shape[2]
+        self.n_patterns = self.dfds.n_patterns
+        self.l_patterns = self.dfds.patterns.shape[-1]
 
         # convert to tensors
         if not torch.is_tensor(self.dfds.stsds.STS):
