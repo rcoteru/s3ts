@@ -15,20 +15,20 @@ class CNN_GAP_IMG(torch.nn.Module):
 
         # convolutional layer 0
         self.cnn_0 = nn.Sequential(nn.Conv2d(in_channels=channels, 
-            out_channels=self.n_feature_maps//2, kernel_size=7, padding='same'),
-            nn.BatchNorm2d(num_features=self.n_feature_maps//2),
-            nn.ReLU(), nn.MaxPool2d(kernel_size=2))
+            out_channels=self.n_feature_maps, kernel_size=8, padding='same'),
+            nn.BatchNorm2d(num_features=self.n_feature_maps),
+            nn.ReLU())
         
         # convolutional layer 1
         self.cnn_1 = nn.Sequential(nn.Conv2d(in_channels=self.n_feature_maps//2, 
-            out_channels=self.n_feature_maps, kernel_size=5, padding='same'),
+            out_channels=self.n_feature_maps*2, kernel_size=5, padding='same'),
             nn.BatchNorm2d(num_features=self.n_feature_maps),
-            nn.ReLU(), nn.MaxPool2d(kernel_size=2))
+            nn.ReLU())
         
         # convolutional layer 2
         self.cnn_2 = nn.Sequential(nn.Conv2d(in_channels=self.n_feature_maps, 
-            out_channels=self.n_feature_maps*2, kernel_size=3, padding='valid'),
-            nn.BatchNorm2d(num_features=self.n_feature_maps*2),
+            out_channels=self.n_feature_maps, kernel_size=3, padding='valid'),
+            nn.BatchNorm2d(num_features=self.n_feature_maps),
             nn.ReLU())
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
