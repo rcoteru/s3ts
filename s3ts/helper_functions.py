@@ -86,9 +86,9 @@ def load_dmdataset(
         meds = sts_medoids(ds, pattern_size=pattern_size, meds_per_class=num_medoids, n=compute_n)
     else:
         print("Using synthetic shapes...")
-        meds = np.empty((3, window_size))
-        meds[0,:] = np.linspace(-1, 1, window_size)
-        meds[1,:] = np.linspace(1, -1, window_size)
+        meds = np.empty((3, pattern_size))
+        meds[0,:] = np.linspace(-1, 1, pattern_size)
+        meds[1,:] = np.linspace(1, -1, pattern_size)
         meds[2,:] = 0
 
     print("Computing dissimilarity frames...")
