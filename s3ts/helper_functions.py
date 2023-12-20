@@ -14,6 +14,8 @@ from s3ts.data.stsdataset import LSTSDataset
 from s3ts.data.label_mappings import *
 from s3ts.data.methods import *
 
+from s3ts.api.nets.methods import create_model_from_DM
+
 from torchvision.transforms import Normalize
 
 def get_parser():
@@ -207,3 +209,30 @@ def load_tsdataset(
     print(f"Using {len(dm.ds_train)} observations for training and {len(dm.ds_val)} observations for validation and test")
 
     return dm
+
+def load_dm(args):
+    if args.mode == "img":
+        dm = load_dmdataset(
+            args.dataset, dataset_home_directory=args.dataset_dir, 
+            rho=args.rho, batch_size=args.batch_size, num_workers=args.num_workers, 
+            window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
+            compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
+            label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids, overlap=args.overlap)
+    elif args.mode in ["ts", "dtw"]:
+        dm = load_tsdataset(
+            args.dataset, dataset_home_directory=args.dataset_dir, 
+            batch_size=args.batch_size, num_workers=args.num_workers, 
+            window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size,
+            subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
+            label_mode=args.label_mode, overlap=args.overlap)
+        
+    return dm
+
+def get_model(name, args, dm):
+    model = create_model_from_DM(dm, name=name, 
+        dsrc=args.mode, arch=args.encoder_architecture, dec_arch=args.decoder_architecture,
+        task="cls", lr=args.lr, enc_feats=args.encoder_features, 
+        dec_feats=args.decoder_features, dec_layers=args.decoder_layers,
+        voting={"n": args.voting, "rho": args.rho})
+    
+    return model
