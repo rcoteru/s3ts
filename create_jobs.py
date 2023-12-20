@@ -27,7 +27,7 @@ class Experiments:
     use_medoids = [True, False]
     label_mode = 1
     voting = 1
-    pattern_size = [8, 16, 32, 48]
+    pattern_size = [16, 32, 48]
 
 def create_jobs(args):
     modelname = get_model_name(args)
