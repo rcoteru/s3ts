@@ -103,7 +103,7 @@ def train_model(
     # run the validation with the final weights
     data = tr.validate(model, datamodule=dm)
 
-    return model, {f"val_{m}": data[0][f"val_{m}"] for m in metrics["all"]}
+    return model, data[0]
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 

@@ -121,9 +121,9 @@ class LSTSDataset(LightningDataModule):
             raise Exception(f"Overlap must be smaller than window size, overlap:{overlap}, window_size {self.wdw_len}")
 
         total_observations = self.stsds.indices.shape[0]
-        train_indices = np.arange(0, total_observations, skip)[data_split["train"](self.stsds.indices)]
-        test_indices = np.arange(0, total_observations, skip)[data_split["test"](self.stsds.indices)]
-        val_indices = np.arange(0, total_observations, skip)[data_split["val"](self.stsds.indices)]
+        train_indices = np.arange(total_observations)[data_split["train"](self.stsds.indices)][::skip]
+        test_indices = np.arange(total_observations)[data_split["test"](self.stsds.indices)][::skip]
+        val_indices = np.arange(total_observations)[data_split["val"](self.stsds.indices)][::skip]
 
         if reduce_train_imbalance:
             train_indices = reduce_imbalance(train_indices, self.stsds.SCS[self.stsds.indices[train_indices]], seed=random_seed)

@@ -210,9 +210,9 @@ class LDFDataset(StreamingFramesDM):
             raise Exception(f"Overlap must be smaller than window size, overlap:{overlap}, window_size {self.wdw_len}")
 
         total_observations = self.dfds.stsds.indices.shape[0]
-        train_indices = np.arange(0, total_observations, skip)[data_split["train"](self.dfds.stsds.indices)]
-        test_indices = np.arange(0, total_observations, skip)[data_split["test"](self.dfds.stsds.indices)]
-        val_indices = np.arange(0, total_observations, skip)[data_split["val"](self.dfds.stsds.indices)]
+        train_indices = np.arange(total_observations)[data_split["train"](self.dfds.stsds.indices)][::skip]
+        test_indices = np.arange(total_observations)[data_split["test"](self.dfds.stsds.indices)][::skip]
+        val_indices = np.arange(total_observations)[data_split["val"](self.dfds.stsds.indices)][::skip]
 
         if reduce_train_imbalance:
             train_indices = reduce_imbalance(train_indices, self.dfds.stsds.SCS[self.dfds.stsds.indices[train_indices]], seed=random_seed)

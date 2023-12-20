@@ -6,6 +6,7 @@ str_time = lambda b: f"{int(b//3600):02d}:{int((b%3600)//60):02d}:{int((b%3600)%
 
 from argparse import ArgumentParser
 import multiprocessing
+import pandas as pd
 
 # dataset imports
 from s3ts.data.har_datasets import *
@@ -236,3 +237,27 @@ def get_model(name, args, dm):
         voting={"n": args.voting, "rho": args.rho})
     
     return model
+
+def save_csv(args, data, root_dir, filename):
+    filepath = os.path.join(root_dir, filename)
+    if os.path.exists(filepath):
+        os.rename(filepath, filepath + "old")
+        df = pd.read_csv(filepath + "old")
+    elif os.path.exists(filepath + "old"):
+        a = time()
+        while time()-a < 10: # wait max of 10 seconds if another process is accessing the csv
+            if os.path.exists(filepath):
+                os.rename(filepath, filepath + "old")
+                df = pd.read_csv(filepath + "old")
+                break
+    else:
+        df = pd.DataFrame()
+
+    save_data = {**data, **args.__dict__}
+    for key in save_data.keys():
+        if key not in df.columns:
+            df[key] = None
+    df.loc[len(df)] = data
+
+    df.to_csv(filepath)
+    os.rmdir(filepath + "old")
