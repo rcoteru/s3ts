@@ -1,38 +1,76 @@
 import os
+import numpy as np
 
-dataset = "HARTH"
-subjects_for_test = [21]
-EPOCHS = 30
-RHO = 0.1
+class Experiments:
+    cpus = 16
+    ram = 32
+    num_workers = 8
+    dataset = "HARTH"
+    subjects_for_test = [
+        [21]
+    ]
+    epochs = 30
+    rho = 0.1
+    batch_size = 128
+    lr = 0.001
+    mode = "img"
+    encoder_architecture = "cnn_gap"
+    encoder_features = 20
+    decoder_architecture = "mlp"
+    decoder_features = 32
+    decoder_layers = 1
+    window_size = 48
+    window_stride = [1, 2]
+    num_medoids = 1
+    compute_n = 300
+    overlap = [-1, 45]
+    use_medoids = [True, False]
+    label_mode = 1
+    voting = 1
+    pattern_size = [8, 16, 32, 48]
 
-BATCH_SIZES = [128]
-LEARNING_RATES = [1e-3]
-ENCODERS = ["cnn_gap"]
-ENCODER_FEATURES = [32]
-DECODERS = ["mlp"]
-MODES = ["img", "ts"]
-DECODER_FEATURES = [32]
-WINDOW_SIZES = [48]
-WINDOW_STRIDES = [1, 2]
-DECODER_LAYERS = 1
-RAM = 32
-VOTING = 1
-LABEL_MODE = 1
-MEDOIDS_PER_CLASS = 1
-MEDOIDS_N = 300
+class Arguments:
+    cpus: int = None
+    ram: int = None
+    num_workers: int = None
+    dataset: str = None
+    subjects_for_test: list[int] = None
+    epochs: int = None
+    rho: float = None
+    batch_size: int = None
+    lr: float = None
+    mode: str = None
+    encoder_architecture: str = None
+    encoder_features: int = None
+    decoder_architecture: str = None
+    decoder_features: str = None
+    decoder_layers: int = None
+    window_size: int = None
+    window_stride: int = None
+    num_medoids: int = None
+    compute_n: int = None
+    overlap: int = None
+    use_medoids: bool = None
+    label_mode: int = None
+    voting: int = None
+    pattern_size: int = None
 
-def create_jobs(mode, batch_size, window_size, window_stride, learning_rate, encoder, encoder_features, decoder, decoder_features):
+def create_jobs(args):
 
-    jobname = f"job_{mode}_{encoder}{encoder_features}_{decoder}{decoder_features}_{DECODER_LAYERS}" + \
-              f"_lr{learning_rate}_wsize{window_size}_wstride{window_stride}_bs{batch_size}"
-    return jobname, f'''#!/bin/bash
+    modelname = f"{'med' if args.use_medoids else 'syn'}_{args.dataset}_{args.mode}_rho{args.rho}_lr{args.lr}_bs{args.batch_size}_" + \
+                f"{args.encoder_architecture}{args.encoder_features}_" + \
+                f"{args.decoder_architecture}{args.decoder_features}_{args.decoder_layers}_" + \
+                f"w{args.window_size}.{args.window_stride}_p{args.pattern_size}_" + \
+                f"lmode{args.label_mode}_v{args.voting}_ovrlp{args.overlap}"
+
+    return modelname, f'''#!/bin/bash
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem={RAM}GB
+#SBATCH --cpus-per-task={args.cpus}
+#SBATCH --mem={args.ram}GB
 #SBATCH --time=1-00:00:00
-#SBATCH --job-name={jobname}
+#SBATCH --job-name={modelname}
 #SBATCH --output=R-%x.%j.out
 #SBATCH --error=R-%x.%j.err
 
@@ -41,37 +79,54 @@ cd $HOME/s3ts
 source $HOME/.bashrc
 source activate dev
 
-python training.py --dataset {dataset} --window_size {window_size*2 if mode=="dtw" else window_size} --window_stride {window_stride} \\
---pattern_size {window_size} \\
---subjects_for_test {" ".join([str(subject) for subject in subjects_for_test])} \\
---encoder_architecture {encoder} --encoder_features {encoder_features} \\
---decoder_architecture {decoder} --decoder_features {decoder_features} --decoder_layers {DECODER_LAYERS} \\
---mode {mode} --max_epochs {EPOCHS} \\
---batch_size {batch_size} --lr {learning_rate} --num_workers 8 \\
---reduce_imbalance --normalize --label_mode {LABEL_MODE} --num_medoids {MEDOIDS_PER_CLASS} --compute_n {MEDOIDS_N} \\
---rho {RHO} --voting {VOTING}
+python training.py --dataset {args.dataset} --window_size {args.window_size*2 if args.mode=="dtw" else args.window_size} --window_stride {args.window_stride} \\
+--pattern_size {args.pattern_size} \\
+--subjects_for_test {" ".join([str(subject) for subject in args.subjects_for_test])} \\
+--encoder_architecture {args.encoder_architecture} --encoder_features {args.encoder_features} \\
+--decoder_architecture {args.decoder_architecture} --decoder_features {args.decoder_features} --decoder_layers {args.decoder_layers} \\
+--mode {args.mode} --max_epochs {args.epochs} \\
+--batch_size {args.batch_size} --lr {args.lr} --num_workers {args.num_workers} \\
+--reduce_imbalance --normalize --label_mode {args.label_mode} --num_medoids {args.num_medoids} --compute_n {args.compute_n} \\
+--rho {args.rho} --voting {args.voting} --use_{"medoids" if args.use_medoids else "synthetic"} --overlap {args.overlap}
 '''
 
 if __name__ == "__main__":
     if not os.path.exists("cache_jobs"):
         os.mkdir(os.path.join("./", "cache_jobs"))
 
+    multiple_arguments = []
+    for key, value in Experiments.__dict__.items():
+        if "__" not in key:
+            if isinstance(value, list):
+                multiple_arguments.append((key, len(value)))
+
+    total_experiments = np.prod([it[1] for it in multiple_arguments])
+    total_experiments
+
+    experiment_arguments = [Arguments() for i in range(total_experiments)]
+
+    k = 1
+    for key, value in Experiments.__dict__.items():
+        if "__" in key:
+            continue
+
+        if isinstance(value, list):
+            print(key)
+            n = len(value)
+            for i, experiment_arg in enumerate(experiment_arguments):
+                setattr(experiment_arg, key, value[(i//k)%n])
+            k *= n
+        else:
+            for experiment_arg in experiment_arguments:
+                setattr(experiment_arg, key, value)
+    
     jobs = []
 
-    for mode in MODES:
-        for batch_size in BATCH_SIZES:
-            for window_size in WINDOW_SIZES:
-                for window_stride in WINDOW_STRIDES:
-                    for learning_rate in LEARNING_RATES:
-                        for encoder in ENCODERS:
-                            for encoder_features in ENCODER_FEATURES:
-                                for decoder in DECODERS:
-                                    for decoder_features in DECODER_FEATURES:
-                                        jobname, job = create_jobs(mode, batch_size, window_size, window_stride, learning_rate, encoder, encoder_features, decoder, decoder_features)
-                                        
-                                        jobs.append("sbatch " + jobname + ".job")
-                                        with open(os.path.join("./", "cache_jobs", jobname + ".job"), "w") as f:
-                                            f.write(job)
+    for exp_arg in experiment_arguments:
+        jobname, job = create_jobs(exp_arg)
+        jobs.append("sbatch " + jobname + ".job")
+        with open(os.path.join("./", "cache_jobs", jobname + ".job"), "w") as f:
+            f.write(job)
 
     bash_script = "#!\\bin\\bash\n" + "\n".join(jobs)
     with open(os.path.join("./", "cache_jobs", "launch.sh"), "w") as f:
