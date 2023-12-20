@@ -257,7 +257,9 @@ def save_csv(args, data, root_dir, filename):
     for key in save_data.keys():
         if key not in df.columns:
             df[key] = None
-    df.loc[len(df)] = data
+    df.loc[len(df)] = save_data
 
     df.to_csv(filepath)
-    os.rmdir(filepath + "old")
+
+    if os.path.exists(filepath + "old"):
+        os.remove(filepath + "old")
