@@ -63,7 +63,8 @@ def load_dmdataset(
         reduce_train_imbalance = False,
         num_medoids = 1,
         label_mode = 1,
-        use_medoids = True):
+        use_medoids = True,
+        overlap = -1):
     
     assert pattern_size <= window_size
     
@@ -109,7 +110,7 @@ def load_dmdataset(
         dfds.dm_transform = dm_transform
 
     dm = LDFDataset(dfds, data_split=data_split, batch_size=batch_size, random_seed=42, 
-        num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance, label_mode=label_mode)
+        num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance, label_mode=label_mode, overlap=overlap)
 
     print(f"Using {len(dm.ds_train)} observations for training and {len(dm.ds_val)} observations for validation and test")
 
@@ -127,7 +128,8 @@ def load_tsdataset(
         pattern_size = None,
         subjects_for_test = None,
         reduce_train_imbalance = False,
-        label_mode = 1):
+        label_mode = 1,
+        overlap = -1):
     
     ds = load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize)
         
@@ -136,7 +138,7 @@ def load_tsdataset(
     data_split = split_by_test_subject(ds, subjects_for_test)
 
     dm = LSTSDataset(ds, data_split=data_split, batch_size=batch_size, random_seed=42, 
-        num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance, label_mode=label_mode)
+        num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance, label_mode=label_mode, overlap=overlap)
     dm.l_patterns = pattern_size
 
     print(f"Using {len(dm.ds_train)} observations for training and {len(dm.ds_val)} observations for validation and test")

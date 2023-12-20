@@ -13,18 +13,20 @@ def main(args):
             rho=args.rho, batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
             compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
-            label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids)
+            label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids, overlap=args.overlap)
     elif args.mode in ["ts", "dtw"]:
         dm = load_tsdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, 
             batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size,
             subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
-            label_mode=args.label_mode)
+            label_mode=args.label_mode, overlap=args.overlap)
 
-    modelname = f"model_{args.dataset}_{args.mode}_rho{args.rho}_{args.encoder_architecture}{args.encoder_features}_" + \
-                f"{args.decoder_architecture}{args.decoder_features}_{args.decoder_layers}" + \
-                f"_lr{args.lr}_wsize{args.window_size}_wstride{args.window_stride}_bs{args.batch_size}"
+    modelname = f"{'med' if args.use_medoids else 'syn'}_{args.dataset}_{args.mode}_rho{args.rho}_lr{args.lr}_bs{args.batch_size}_" + \
+                f"{args.encoder_architecture}{args.encoder_features}_" + \
+                f"{args.decoder_architecture}{args.decoder_features}_{args.decoder_layers}_" + \
+                f"w{args.window_size}.{args.window_stride}_p{args.pattern_size}_" + \
+                f"lmode{args.label_mode}_v{args.voting}_ovrlp{args.overlap}"
 
     model = create_model_from_DM(dm, name=modelname, 
         dsrc=args.mode, arch=args.encoder_architecture, dec_arch=args.decoder_architecture,
@@ -83,6 +85,8 @@ if __name__ == "__main__":
         help="Use medoids for DM computation")
     parser.add_argument("--use_synthetic", action="store_false", dest="use_medoids", 
         help="Use synthetic shapes for DM computation")
+    parser.add_argument("--overlap", default=-1, type=int, 
+        help="Overlap of observations between training and test examples, default -1 for maximum overlap (equivalent to overlap set to window size -1)")
 
     args = parser.parse_args()
     
