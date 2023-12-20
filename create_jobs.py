@@ -111,8 +111,8 @@ if __name__ == "__main__":
             continue
 
         if isinstance(value, list):
-            print(key)
             n = len(value)
+            print("Argument with multiple values:", key, "with", n, "values")
             for i, experiment_arg in enumerate(experiment_arguments):
                 setattr(experiment_arg, key, value[(i//k)%n])
             k *= n
@@ -131,3 +131,5 @@ if __name__ == "__main__":
     bash_script = "#!\\bin\\bash\n" + "\n".join(jobs)
     with open(os.path.join("./", "cache_jobs", "launch.sh"), "w") as f:
         f.write(bash_script)
+
+    print(f"Number of experiments created: {len(jobs)}")
