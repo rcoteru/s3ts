@@ -31,10 +31,15 @@ class CNN_GAP_IMG(torch.nn.Module):
             nn.BatchNorm2d(num_features=self.n_feature_maps*2),
             nn.ReLU())
         
+        self.last = nn.Sequential(nn.Conv2d(in_channels=self.n_feature_maps*2,
+            out_channels=self.n_feature_maps*4, kernel_size=1, padding="same"),
+            nn.ReLU())
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.cnn_0(x)
         x = self.cnn_1(x)
         x = self.cnn_2(x)
+        x = self.last(x)
         return x.mean(dim=(-2, -1)) # global average pooling
 
     def get_output_shape(self) -> torch.Size:
