@@ -1,9 +1,9 @@
 import os
 import numpy as np
 
+from s3ts.helper_functions import get_model_name, get_parser
+
 class Experiments:
-    cpus = 16
-    ram = 32
     num_workers = 8
     dataset = "HARTH"
     subjects_for_test = [
@@ -29,46 +29,15 @@ class Experiments:
     voting = 1
     pattern_size = [8, 16, 32, 48]
 
-class Arguments:
-    cpus: int = None
-    ram: int = None
-    num_workers: int = None
-    dataset: str = None
-    subjects_for_test: list[int] = None
-    epochs: int = None
-    rho: float = None
-    batch_size: int = None
-    lr: float = None
-    mode: str = None
-    encoder_architecture: str = None
-    encoder_features: int = None
-    decoder_architecture: str = None
-    decoder_features: str = None
-    decoder_layers: int = None
-    window_size: int = None
-    window_stride: int = None
-    num_medoids: int = None
-    compute_n: int = None
-    overlap: int = None
-    use_medoids: bool = None
-    label_mode: int = None
-    voting: int = None
-    pattern_size: int = None
-
 def create_jobs(args):
-
-    modelname = f"{'med' if args.use_medoids else 'syn'}_{args.dataset}_{args.mode}_rho{args.rho}_lr{args.lr}_bs{args.batch_size}_" + \
-                f"{args.encoder_architecture}{args.encoder_features}_" + \
-                f"{args.decoder_architecture}{args.decoder_features}_{args.decoder_layers}_" + \
-                f"w{args.window_size}.{args.window_stride}_p{args.pattern_size}_" + \
-                f"lmode{args.label_mode}_v{args.voting}_ovrlp{args.overlap}"
+    modelname = get_model_name(args)
 
     return modelname, f'''#!/bin/bash
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task={args.cpus}
-#SBATCH --mem={args.ram}GB
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32GB
 #SBATCH --time=1-00:00:00
 #SBATCH --job-name={modelname}
 #SBATCH --output=R-%x.%j.out
@@ -103,7 +72,8 @@ if __name__ == "__main__":
     total_experiments = np.prod([it[1] for it in multiple_arguments])
     total_experiments
 
-    experiment_arguments = [Arguments() for i in range(total_experiments)]
+    parser = get_parser()
+    experiment_arguments = [parser.parse_args([]) for i in range(total_experiments)]
 
     k = 1
     for key, value in Experiments.__dict__.items():
