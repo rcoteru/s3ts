@@ -9,7 +9,7 @@ def dtw_compute_no_n(dtw: torch.Tensor, dist_grad: torch.Tensor, grad: torch.Ten
     '''
     k, len_pattern, len_window = dtw.shape
     # very big tensor
-    grads = torch.zeros(k, grad.shape[1], len_pattern, len_pattern, len_window) # shape (n, k, dims, pattern_len, pattern_len, window_size)
+    grads = torch.zeros(k, grad.shape[1], len_pattern, len_pattern, len_window, device=grad.device) # shape (n, k, dims, pattern_len, pattern_len, window_size)
 
     for i in range(len_pattern):
         grads[:, :, i, i, :] = torch.cumsum(dist_grad[:, :, i, :], dim=2)
