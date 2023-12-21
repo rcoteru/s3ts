@@ -75,11 +75,11 @@ class DFDataset(Dataset):
                 DM = self._compute_dm(patterns, self.stsds.splits[s:s+2], save_path=None)
                 self.DM.append(torch.from_numpy(DM))
 
-    def __del__(self):
-        if not self.cache_dir is None:
-            for file in os.listdir(self.cache_dir):
-                os.remove(os.path.join(self.cache_dir, file))
-            os.rmdir(self.cache_dir)
+    # def __del__(self):
+    #     if not self.cache_dir is None:
+    #         for file in os.listdir(self.cache_dir):
+    #             os.remove(os.path.join(self.cache_dir, file))
+    #         os.rmdir(self.cache_dir)
 
     def _compute_dm(self, pattern, split, save_path):
         if len(pattern.shape) == 3:

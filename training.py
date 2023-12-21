@@ -3,8 +3,6 @@ import os
 from s3ts.helper_functions import *
 from s3ts.api.nets.methods import train_model
 
-import pandas as pd
-
 ROOT_DIR = "training"
 
 def main(args):
@@ -19,7 +17,9 @@ def main(args):
             "seed": 42
         })
     
-    save_csv(args, data, ROOT_DIR, "out.csv")
+    with open(os.path.join(ROOT_DIR, modelname, "results.dict"), "w") as f:
+        f.write(str({**data, **args.__dict__}))
+    
     print(data)
 
 if __name__ == "__main__":
