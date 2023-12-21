@@ -6,7 +6,7 @@ class DTWLayer(torch.nn.Module):
     def __init__(self, n_patts, d_patts, l_patts, l_out: int = None, rho: float = 1) -> None:
         super().__init__()
 
-        if not l_out is None:
+        if l_out is None:
             self.l_out = l_patts
         else:
             self.l_out = l_out
