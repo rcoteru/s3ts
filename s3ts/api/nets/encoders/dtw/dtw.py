@@ -65,7 +65,7 @@ def dtw_fast_no_n(x: torch.Tensor, y: torch.Tensor, w: float, eps: float = 1e-5,
         # p_diff now contains the partial derivatives of DTW[n, k, i, j] wrt K[k, d, i] (dims (n, k, d, i, j))
         p_diff = p_diff / torch.sqrt(euc_d[:,:, None, :, :] + eps)
         
-        grads = torch.zeros((x.shape[0], y.shape[0], y.shape[1], y.shape[2])) # dims (n, k, d, i)
+        grads = torch.zeros((x.shape[0], y.shape[0], y.shape[1], y.shape[2]), device=y.device) # dims (n, k, d, i)
 
         futures = [torch.jit.fork(dtw_compute_no_n, euc_d[i], p_diff[i], grads[i], w) for i in range(x.shape[0])] 
         results = [torch.jit.wait(future) for future in futures]
