@@ -1,5 +1,4 @@
 import os
-import pandas as pd
 
 from argparse import ArgumentParser
 
@@ -20,6 +19,7 @@ def main(args):
             entries.append(entry)
     entries = list(set(entries))
     entries = list(filter(lambda x: "val" in x, entries))
+    entries.sort()
 
     print(f"{'MODELNAME':>65}", end=" |")
     for entry in list(set(entries)):
