@@ -21,7 +21,7 @@ from s3ts.api.nets.encoders.series.RES_GAP import RES_GAP_TS
 from s3ts.api.nets.decoders.linear import LinearDecoder
 from s3ts.api.nets.decoders.mlp import MultiLayerPerceptron
 
-from s3ts.api.nets.encoders.dtw.dtw_layer import DTWLayer
+from s3ts.api.nets.encoders.dtw.dtw_layer import DTWLayer, DTWLayerPerChannel
 
 # base torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -31,9 +31,10 @@ import torch.nn as nn
 import numpy as np
 import torch
 
+dtw_mode = {"dtw": DTWLayer, "dtw_c": DTWLayerPerChannel}
+
 encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG, "res_gap": RES_GAP_IMG},
-    "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS, "simplecnn": SimpleCNN_TS, "cnn_gap": CNN_GAP_TS, "res_gap": RES_GAP_TS},
-    "dtw": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG, "res_gap": RES_GAP_IMG}}
+    "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS, "simplecnn": SimpleCNN_TS, "cnn_gap": CNN_GAP_TS, "res_gap": RES_GAP_TS}}
 
 decoder_dict = {"linear": LinearDecoder, "mlp": MultiLayerPerceptron}
 
@@ -79,7 +80,10 @@ class WrapperModel(LightningModule):
         self.save_hyperparameters()
 
         # select model architecture class
-        enc_arch: LightningModule = encoder_dict[dsrc][arch]
+        if dsrc in ["dtw", "dtw_c"]:
+            enc_arch: LightningModule = encoder_dict["img"][arch]
+        else:
+            enc_arch: LightningModule = encoder_dict[dsrc][arch]
 
         # create encoder
         if dsrc == "img":
@@ -87,8 +91,12 @@ class WrapperModel(LightningModule):
         elif dsrc == "ts":
             ref_size, channels = 1, self.n_dims
         elif dsrc == "dtw":
-            self.dtw_layer = DTWLayer(n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=wdw_len-l_patterns, rho=self.voting["rho"]/10)
+            self.dtw_layer = dtw_mode[dsrc](n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=wdw_len-l_patterns, rho=self.voting["rho"]/10)
             ref_size, channels = l_patterns, enc_feats
+            self.wdw_len = wdw_len-l_patterns
+        elif dsrc == "dtw_c":
+            self.dtw_layer = dtw_mode[dsrc](n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=wdw_len-l_patterns, rho=self.voting["rho"]/10)
+            ref_size, channels = l_patterns, enc_feats*self.n_dims
             self.wdw_len = wdw_len-l_patterns
 
         encoder = enc_arch(channels=channels, ref_size=ref_size, 
@@ -129,7 +137,7 @@ class WrapperModel(LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward pass. """
-        if self.dsrc == "dtw":
+        if self.dsrc == "dtw" or self.dsrc == "dtw_c":
             x = self.dtw_layer(x)
         x = self.encoder(x)
         x = self.flatten(x)
@@ -142,7 +150,7 @@ class WrapperModel(LightningModule):
         return x
     
     def logits(self, x: torch.Tensor) -> torch.Tensor:
-        if self.dsrc == "dtw":
+        if self.dsrc == "dtw" or self.dsrc == "dtw_c":
             x = self.dtw_layer(x)
         x = self.encoder(x)
         x = self.flatten(x)
@@ -156,7 +164,7 @@ class WrapperModel(LightningModule):
         # Forward pass
         if self.dsrc == "img":
             output = self.logits(batch["frame"])
-        elif self.dsrc == "ts" or self.dsrc == "dtw":
+        elif self.dsrc == "ts" or self.dsrc == "dtw" or self.dsrc == "dtw_c":
             output = self.logits(batch["series"])
 
         # Compute the loss and metrics
