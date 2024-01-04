@@ -37,3 +37,53 @@ def gaf_compute(X: torch.Tensor, mode: str = "s", scaling: Tuple[float, float] =
         return X_cos.unsqueeze(-2) * X_cos.unsqueeze(-1) - X_sin.unsqueeze(-2) * X_sin.unsqueeze(-1)
     else: # difference
         return X_sin.unsqueeze(-2) * X_cos.unsqueeze(-1) - X_cos.unsqueeze(-2) * X_sin.unsqueeze(-1)
+
+# Markov transition Fields
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+@torch.jit.script
+def mtm_compute(X_binned: torch.Tensor, n_bins: int) -> torch.Tensor:
+    # compute markov transition matrix
+    current_bin = X_binned[..., :-1].view(-1, X_binned.shape[-1]-1)
+    next_bin = X_binned[..., 1:].view(-1, X_binned.shape[-1]-1)
+
+    # indices to sum +1
+    indices = current_bin * n_bins + next_bin
+
+    X_mtm = torch.zeros(X_binned.shape[:-1] + (n_bins, n_bins))
+    X_mtm.view(-1, n_bins*n_bins).scatter_add_(1, indices, torch.ones_like(indices, dtype=X_mtm.dtype))
+
+    sum_mtm = X_mtm.sum(axis=-1)
+    X_mtm /= torch.where(sum_mtm[..., None] == 0, 1, sum_mtm[..., None]) # normalize
+
+    return X_mtm
+
+@torch.jit.script
+def mtf_compute(X: torch.Tensor, bins: int = 50, scaling: Tuple[float, float] = (-1, 1)) -> torch.Tensor:
+    '''
+        Computes the Markov Transition Field of time series X, per sample, per channel
+        input has shape (...,N, d, window_size) (any number of leading dimensions)
+        output has shape (..., N, d, window_size, window_size)
+
+        Bins are uniformly spaced then computes the MTF of size (window_size * window_size)
+
+        NOTE This implementation is the same as the one in tslearn for uniform bins
+    '''
+
+    X_scaled = minmax_scaler(X, scaling)
+    wsize = X.shape[-1]
+    bins_boundaries = torch.linspace(scaling[0], scaling[1], bins+1)[1:-1]
+
+    X_binned = torch.bucketize(X_scaled, bins_boundaries)
+    n_bins = bins_boundaries.numel() + 1
+
+    X_mtm = mtm_compute(X_binned, n_bins) # (..., N, d, bins, bins)
+
+    # X_mtf[i, j, k] = X_mtm[i, X_binned[i, j], X_binned[i, k]]
+    jkindices = torch.arange(wsize*wsize)
+    indices = n_bins * X_binned.view(-1, wsize)[:,jkindices // wsize] + X_binned.view(-1, wsize)[:,jkindices % wsize]
+
+    X_mtf = X_mtm.view(-1, n_bins*n_bins)[torch.arange(indices.shape[0])[:, None], indices]
+    X_mtf = X_mtf.reshape(X.shape + (X.shape[-1],))
+
+    return X_mtf
