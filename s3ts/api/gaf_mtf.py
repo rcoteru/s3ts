@@ -9,13 +9,13 @@ from typing import Tuple
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 @torch.jit.script
-def minmax_scaler(X: torch.Tensor, range: Tuple[float, float] = (-1, 1)) -> torch.Tensor:
+def minmax_scaler(X: torch.Tensor, range: Tuple[float, float] = (-1, 1), eps: float = 1e-6) -> torch.Tensor:
     '''
         Scales the last dimension of X into the given range X has shape (...,d)
         output has the same shape but the last dimension is scaled to the range
     '''
     X_min = X.min(dim=-1, keepdim=True).values
-    X_std = (X - X_min)/(X.max(dim=-1, keepdim=True).values - X_min)
+    X_std = (X - X_min)/(X.max(dim=-1, keepdim=True).values - X_min + eps)
     return X_std * (range[1] - range[0]) + range[0]
 
 @torch.jit.script
@@ -33,7 +33,6 @@ def gaf_compute(X: torch.Tensor, mode: str = "s", scaling: Tuple[float, float] =
     X_sin = torch.clamp((1.0 - X_cos.square()).sqrt(), 0, 1)
 
     if "s" in mode: # summation
-        print("hi")
         return X_cos.unsqueeze(-2) * X_cos.unsqueeze(-1) - X_sin.unsqueeze(-2) * X_sin.unsqueeze(-1)
     else: # difference
         return X_sin.unsqueeze(-2) * X_cos.unsqueeze(-1) - X_cos.unsqueeze(-2) * X_sin.unsqueeze(-1)
@@ -53,7 +52,7 @@ def mtm_compute(X_binned: torch.Tensor, n_bins: int) -> torch.Tensor:
     X_mtm = torch.zeros(X_binned.shape[:-1] + (n_bins, n_bins))
     X_mtm.view(-1, n_bins*n_bins).scatter_add_(1, indices, torch.ones_like(indices, dtype=X_mtm.dtype))
 
-    sum_mtm = X_mtm.sum(axis=-1)
+    sum_mtm = X_mtm.sum(dim=-1)
     X_mtm /= torch.where(sum_mtm[..., None] == 0, 1, sum_mtm[..., None]) # normalize
 
     return X_mtm

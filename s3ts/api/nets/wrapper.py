@@ -80,7 +80,7 @@ class WrapperModel(LightningModule):
         self.save_hyperparameters()
 
         # select model architecture class
-        if dsrc in ["dtw", "dtw_c"]:
+        if dsrc in ["dtw", "dtw_c", "mtf", "gasf", "gadf"]:
             enc_arch: LightningModule = encoder_dict["img"][arch]
         else:
             enc_arch: LightningModule = encoder_dict[dsrc][arch]
@@ -91,13 +91,18 @@ class WrapperModel(LightningModule):
         elif dsrc == "ts":
             ref_size, channels = 1, self.n_dims
         elif dsrc == "dtw":
-            self.dtw_layer = dtw_mode[dsrc](n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=wdw_len-l_patterns, rho=self.voting["rho"]/10)
             ref_size, channels = l_patterns, enc_feats
             self.wdw_len = wdw_len-l_patterns
         elif dsrc == "dtw_c":
-            self.dtw_layer = dtw_mode[dsrc](n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=wdw_len-l_patterns, rho=self.voting["rho"]/10)
             ref_size, channels = l_patterns, enc_feats*self.n_dims
             self.wdw_len = wdw_len-l_patterns
+        elif dsrc in ["mtf", "gasf", "gadf"]:
+            ref_size, channels = wdw_len, self.n_dims
+
+        self.initial_transform = None
+        if "dtw" in dsrc:
+            self.initial_transform = dtw_mode[dsrc](
+                n_patts=enc_feats, d_patts=self.n_dims, l_patts=l_patterns, l_out=wdw_len-l_patterns, rho=self.voting["rho"]/10)
 
         encoder = enc_arch(channels=channels, ref_size=ref_size, 
             wdw_size=self.wdw_len, n_feature_maps=self.enc_feats)
@@ -137,11 +142,7 @@ class WrapperModel(LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward pass. """
-        if self.dsrc == "dtw" or self.dsrc == "dtw_c":
-            x = self.dtw_layer(x)
-        x = self.encoder(x)
-        x = self.flatten(x)
-        x = self.decoder(x)
+        x=self.logits(x)
         if self.task == "cls":
             x = self.softmax(x)
         if self.task == "reg":
@@ -150,8 +151,8 @@ class WrapperModel(LightningModule):
         return x
     
     def logits(self, x: torch.Tensor) -> torch.Tensor:
-        if self.dsrc == "dtw" or self.dsrc == "dtw_c":
-            x = self.dtw_layer(x)
+        if not self.initial_transform is None:
+            x = self.initial_transform(x)
         x = self.encoder(x)
         x = self.flatten(x)
         x = self.decoder(x)
@@ -164,7 +165,9 @@ class WrapperModel(LightningModule):
         # Forward pass
         if self.dsrc == "img":
             output = self.logits(batch["frame"])
-        elif self.dsrc == "ts" or self.dsrc == "dtw" or self.dsrc == "dtw_c":
+        elif self.dsrc in ["mtf", "gasf", "gadf"]:
+            output = self.logits(batch["transformed"])
+        else:
             output = self.logits(batch["series"])
 
         # Compute the loss and metrics

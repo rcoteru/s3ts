@@ -69,6 +69,8 @@ def get_parser():
         help="Use synthetic shapes for DM computation")
     parser.add_argument("--overlap", default=-1, type=int, 
         help="Overlap of observations between training and test examples, default -1 for maximum overlap (equivalent to overlap set to window size -1)")
+    parser.add_argument("--mtf_bins", default=10, type=int, 
+        help="Number of bins for mtf computation")
 
     return parser
 
@@ -77,7 +79,8 @@ def get_model_name(args):
             f"{args.encoder_architecture}{args.encoder_features}_" + \
             f"{args.decoder_architecture}{args.decoder_features}_{args.decoder_layers}_" + \
             f"w{args.window_size}.{args.window_stride}_p{args.pattern_size}_" + \
-            f"lmode{args.label_mode}_v{args.voting}_ovrlp{args.overlap}_subjects{'-'.join([str(subject) for subject in args.subjects_for_test])}"
+            f"lmode{args.label_mode}_v{args.voting}_ovrlp{args.overlap}_subjects{'-'.join([str(subject) for subject in args.subjects_for_test])}_" + \
+            f"{args.mtf_bins}"
 
 def load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize):
  
@@ -195,7 +198,9 @@ def load_tsdataset(
         subjects_for_test = None,
         reduce_train_imbalance = False,
         label_mode = 1,
-        overlap = -1):
+        overlap = -1,
+        mode = None,
+        mtf_bins = 50):
     
     ds = load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize)
         
@@ -204,7 +209,7 @@ def load_tsdataset(
     data_split = split_by_test_subject(ds, subjects_for_test)
 
     dm = LSTSDataset(ds, data_split=data_split, batch_size=batch_size, random_seed=42, 
-        num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance, label_mode=label_mode, overlap=overlap)
+        num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance, label_mode=label_mode, overlap=overlap, mode=mode, mtf_bins=mtf_bins)
     dm.l_patterns = pattern_size
 
     print(f"Using {len(dm.ds_train)} observations for training and {len(dm.ds_val)} observations for validation and test")
@@ -219,13 +224,13 @@ def load_dm(args):
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
             compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
             label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids, overlap=args.overlap)
-    elif args.mode in ["ts", "dtw", "dtw_c"]:
+    elif args.mode in ["ts", "dtw", "dtw_c", "mtf", "gasf", "gadf"]:
         dm = load_tsdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, 
             batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size,
             subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
-            label_mode=args.label_mode, overlap=args.overlap)
+            label_mode=args.label_mode, overlap=args.overlap, mode=args.mode, mtf_bins=args.mtf_bins)
         
     return dm
 

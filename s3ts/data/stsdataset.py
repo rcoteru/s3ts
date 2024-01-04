@@ -7,6 +7,8 @@ from pytorch_lightning import LightningDataModule
 from s3ts.data.base import STSDataset
 from s3ts.data.methods import reduce_imbalance
 
+from s3ts.api.gaf_mtf import mtf_compute, gaf_compute
+
 class StreamingTimeSeries(STSDataset):
 
     def __init__(self,
@@ -41,7 +43,7 @@ class StreamingTimeSeries(STSDataset):
 class StreamingTimeSeriesCopy(Dataset):
 
     def __init__(self,
-            stsds: StreamingTimeSeries, indices: np.ndarray, label_mode: int = 1
+            stsds: StreamingTimeSeries, indices: np.ndarray, label_mode: int = 1, mode: str = None, mtf_bins: int = 30
             ) -> None:
         super().__init__()
 
@@ -50,6 +52,8 @@ class StreamingTimeSeriesCopy(Dataset):
         self.stsds = stsds
         self.indices = indices
         self.label_mode = label_mode
+        self.mode = mode
+        self.mtf_bins = mtf_bins
         
     def __len__(self):
         return self.indices.shape[0]
@@ -63,7 +67,15 @@ class StreamingTimeSeriesCopy(Dataset):
         else:
             c = c[-1]
 
-        return {"series": ts, "label": c}
+        transformed = None
+        if self.mode == "gasf":
+            transformed = gaf_compute(ts, "s", (-1, 1))
+        elif self.mode == "gadf":
+            transformed = gaf_compute(ts, "d", (-1, 1))
+        elif self.mode == "mtf":
+            transformed = mtf_compute(ts, self.mtf_bins, (-1, 1))
+
+        return {"series": ts, "label": c, "transformed": transformed}
     
     def __del__(self):
         del self.stsds
@@ -88,7 +100,9 @@ class LSTSDataset(LightningDataModule):
             num_workers: int = 1,
             reduce_train_imbalance: bool = False,
             label_mode: int = 1,
-            overlap: int = -1
+            overlap: int = -1,
+            mode: str = None,
+            mtf_bins: int = 50
             ) -> None:
 
         # save parameters as attributes
@@ -128,9 +142,9 @@ class LSTSDataset(LightningDataModule):
         if reduce_train_imbalance:
             train_indices = reduce_imbalance(train_indices, self.stsds.SCS[self.stsds.indices[train_indices]], seed=random_seed)
 
-        self.ds_train = StreamingTimeSeriesCopy(self.stsds, train_indices, label_mode)
-        self.ds_test = StreamingTimeSeriesCopy(self.stsds, test_indices, label_mode)
-        self.ds_val = StreamingTimeSeriesCopy(self.stsds, val_indices, label_mode)
+        self.ds_train = StreamingTimeSeriesCopy(self.stsds, train_indices, label_mode, mode, mtf_bins)
+        self.ds_test = StreamingTimeSeriesCopy(self.stsds, test_indices, label_mode, mode, mtf_bins)
+        self.ds_val = StreamingTimeSeriesCopy(self.stsds, val_indices, label_mode, mode, mtf_bins)
         
     def train_dataloader(self) -> DataLoader:
         """ Returns the training DataLoader. """
