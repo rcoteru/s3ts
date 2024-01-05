@@ -1,5 +1,4 @@
 import os
-import numpy as np
 
 from s3ts.arguments import get_model_name, get_command
 
@@ -35,12 +34,12 @@ imgExperiments = {
 
 dtwExperiments = {
     "mode": "dtw",
-    "pattern_size": [16, 32, 48]
+    "pattern_size": [8, 16, 24]
 }
 
 dtwcExperiments = {
     "mode": "dtw_c",
-    "pattern_size": [16, 32, 48]
+    "pattern_size": [8, 16, 24]
 }
 
 tsExperiments = {
@@ -57,7 +56,7 @@ gadfExperiments = {
 
 mtffExperiments = {
     "mode": "mtf",
-    "mtf_bins": 16
+    "mtf_bins": 10
 }
 
 def create_jobs(args):
@@ -95,7 +94,9 @@ def produce_experiments(args):
             if isinstance(value, list):
                 multiple_arguments.append((key, len(value)))
 
-    total_experiments = np.prod([it[1] for it in multiple_arguments])
+    total_experiments = 1
+    for i in multiple_arguments:
+        total_experiments *= i[1]
 
     experiment_arguments = [EmptyExperiment() for i in range(total_experiments)]
 
@@ -122,6 +123,8 @@ def produce_experiments(args):
 
     for exp_arg in experiment_arguments:
         jobname, job = create_jobs(exp_arg)
+        jobname = jobname.replace("|", "_")
+        jobname = jobname.replace(",", "_")
         jobs.append("sbatch " + jobname + ".job")
         with open(os.path.join("./", "cache_jobs", jobname + ".job"), "w") as f:
             f.write(job)
@@ -139,6 +142,9 @@ if __name__ == "__main__":
         jobs += produce_experiments({**baseArguments, **exp})
     
     bash_script = "#!\\bin\\bash\n" + "\n".join(jobs)
+    bash_script = bash_script.replace("|", "_")
+    bash_script = bash_script.replace(",", "_")
+    
     with open(os.path.join("./", "cache_jobs", "launch.sh"), "w") as f:
         f.write(bash_script)
 
