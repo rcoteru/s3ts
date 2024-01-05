@@ -1,7 +1,10 @@
 import os
+from time import time
 
-from s3ts.helper_functions import *
+from s3ts.helper_functions import load_dm, get_model, get_parser, str_time
 from s3ts.api.nets.methods import train_model
+
+from s3ts.arguments import get_model_name
 
 ROOT_DIR = "training"
 
@@ -23,6 +26,8 @@ def main(args):
     print(data)
 
 if __name__ == "__main__":
+    start_time = time()
+
     parser = get_parser()
     args = parser.parse_args()
     

@@ -1,7 +1,7 @@
 
 def get_model_name(args):
     modelname = f"{args.mode}|{args.dataset}," + '-'.join([str(subject) for subject in args.subjects_for_test]) + "|" \
-                f"{args.window_size},{args.window_stride}|bs{args.batch_size}|" + \
+                f"{args.window_size},{args.window_stride}|bs{args.batch_size}_lr{args.lr}|" + \
                 f"{args.encoder_architecture}{args.encoder_features}|" + \
                 f"{args.decoder_architecture}{args.decoder_features},{args.decoder_layers}|" + \
                 (f"m{args.label_mode}|" if args.label_mode > 1 else "") + \
@@ -18,7 +18,7 @@ def get_model_name(args):
     return modelname[:-1]
 
 def get_command(args):
-    command = f"--mode {args.mode} --dataset {args.dataset} " + \
+    command = f"--mode {args.mode} --dataset {args.dataset} --lr {args.lr} " + \
                 "--subjects_for_test " + ' '.join([str(subject) for subject in args.subjects_for_test]) + " " \
                 f"--window_size {args.window_size} --window_stride {args.window_stride} --batch_size {args.batch_size} " + \
                 f"--encoder_architecture {args.encoder_architecture} --encoder_features {args.encoder_features} " + \

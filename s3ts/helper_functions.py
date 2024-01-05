@@ -1,7 +1,6 @@
 import os
 from time import time
 
-start_time = time()
 str_time = lambda b: f"{int(b//3600):02d}:{int((b%3600)//60):02d}:{int((b%3600)%60):02d}.{int(round(b%1, 3)*1000):03d}"
 
 from argparse import ArgumentParser
@@ -73,14 +72,6 @@ def get_parser():
         help="Number of bins for mtf computation")
 
     return parser
-
-def get_model_name(args):
-    return  f"{'med' if args.use_medoids else 'syn'}_{args.dataset}_{args.mode}_rho{args.rho}_lr{args.lr}_bs{args.batch_size}_" + \
-            f"{args.encoder_architecture}{args.encoder_features}_" + \
-            f"{args.decoder_architecture}{args.decoder_features}_{args.decoder_layers}_" + \
-            f"w{args.window_size}.{args.window_stride}_p{args.pattern_size}_" + \
-            f"lmode{args.label_mode}_v{args.voting}_ovrlp{args.overlap}_subjects{'-'.join([str(subject) for subject in args.subjects_for_test])}_" + \
-            f"{args.mtf_bins}"
 
 def load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize):
  
