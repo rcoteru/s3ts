@@ -92,7 +92,7 @@ def train_model(
     ckpt = ModelCheckpoint(monitor=metrics['target'], mode=metrics["mode"])    
     tr = Trainer(default_root_dir=pl_kwargs["default_root_dir"], 
     accelerator=pl_kwargs["accelerator"], callbacks=[ckpt], max_epochs=max_epochs,
-    logger=TensorBoardLogger(save_dir=pl_kwargs["default_root_dir"], name=model.name))
+    logger=TensorBoardLogger(save_dir=pl_kwargs["default_root_dir"], name=model.name.replace("|", "_").replace(",", "_")))
 
     # train the model
     tr.fit(model=model, datamodule=dm)
