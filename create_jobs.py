@@ -1,77 +1,23 @@
 import os
 
 from s3ts.arguments import get_model_name, get_command
-
-baseArguments = {
-    "num_workers": 8,
-    "dataset": "HARTH",
-    "subjects_for_test": [
-        [21]
-    ],
-    "lr": 0.001,
-    "encoder_architecture": "cnn_gap",
-    "encoder_features": 20,
-    "decoder_architecture": "mlp",
-    "decoder_features": 32,
-    "decoder_layers": 1,
-    "window_size": 48,
-    "window_stride": 1,
-    "batch_size": 128,
-    "label_mode": 1,
-    "voting": 1,
-    "rho": 0.1,
-    "overlap": -1,
-    "max_epochs": 30
-}
-
-imgExperiments = {
-    "mode": "img",
-    "num_medoids": 1,
-    "compute_n": 300,
-    "use_medoids": [True, False],
-    "pattern_size": [16, 32, 48]
-}
-
-dtwExperiments = {
-    "mode": "dtw",
-    "pattern_size": [8, 16, 24]
-}
-
-dtwcExperiments = {
-    "mode": "dtw_c",
-    "pattern_size": [8, 16, 24]
-}
-
-tsExperiments = {
-    "mode": "ts"
-}
-
-gasfExperiments = {
-    "mode": "gasf"
-}
-
-gadfExperiments = {
-    "mode": "gadf"
-}
-
-mtffExperiments = {
-    "mode": "mtf",
-    "mtf_bins": 10
-}
+from experiment_definition import experiments, baseArguments, RAM, CPUS
 
 def create_jobs(args):
     modelname = get_model_name(args)
+    modelname_clean = modelname.replace("|", "_")
+    modelname_clean = modelname_clean.replace(",", "_")
 
-    return modelname, f'''#!/bin/bash
+    return modelname, modelname_clean, f'''#!/bin/bash
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=32GB
+#SBATCH --cpus-per-task={CPUS}
+#SBATCH --mem={RAM}GB
 #SBATCH --time=1-00:00:00
-#SBATCH --job-name={modelname}
-#SBATCH --output=R-%x.%j.out
-#SBATCH --error=R-%x.%j.err
+#SBATCH --job-name={modelname_clean}
+#SBATCH --output=O-%x.%j.out
+#SBATCH --error=E-%x.%j.err
 
 cd $HOME/s3ts
 
@@ -122,9 +68,7 @@ def produce_experiments(args):
     jobs = []
 
     for exp_arg in experiment_arguments:
-        jobname, job = create_jobs(exp_arg)
-        jobname = jobname.replace("|", "_")
-        jobname = jobname.replace(",", "_")
+        modelname, jobname, job = create_jobs(exp_arg)
         jobs.append("sbatch " + jobname + ".job")
         with open(os.path.join("./", "cache_jobs", jobname + ".job"), "w") as f:
             f.write(job)
@@ -138,12 +82,10 @@ if __name__ == "__main__":
         os.mkdir(os.path.join("./", "cache_jobs"))
 
     jobs = []
-    for exp in [imgExperiments, dtwExperiments, dtwcExperiments, tsExperiments, gasfExperiments, gadfExperiments, mtffExperiments]:
+    for exp in experiments:
         jobs += produce_experiments({**baseArguments, **exp})
     
     bash_script = "#!\\bin\\bash\n" + "\n".join(jobs)
-    bash_script = bash_script.replace("|", "_")
-    bash_script = bash_script.replace(",", "_")
     
     with open(os.path.join("./", "cache_jobs", "launch.sh"), "w") as f:
         f.write(bash_script)
