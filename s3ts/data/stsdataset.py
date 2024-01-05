@@ -67,15 +67,21 @@ class StreamingTimeSeriesCopy(Dataset):
         else:
             c = c[-1]
 
-        transformed = None
+        
         if self.mode == "gasf":
             transformed = gaf_compute(ts, "s", (-1, 1))
+            return {"series": ts, "label": c, "transformed": transformed}
+
         elif self.mode == "gadf":
             transformed = gaf_compute(ts, "d", (-1, 1))
+            return {"series": ts, "label": c, "transformed": transformed}
+
         elif self.mode == "mtf":
             transformed = mtf_compute(ts, self.mtf_bins, (-1, 1))
+            return {"series": ts, "label": c, "transformed": transformed}
 
-        return {"series": ts, "label": c, "transformed": transformed}
+        else:
+            return {"series": ts, "label": c}
     
     def __del__(self):
         del self.stsds
