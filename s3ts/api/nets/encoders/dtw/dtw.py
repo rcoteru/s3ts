@@ -58,13 +58,15 @@ def dtw_fast_full(x: torch.Tensor, y: torch.Tensor, w: float, eps: float = 1e-5,
     p_diff = x[:,None,:,None,:] - y[None,:,:,:,None] # shape (n, n_kernel, d, Kernel_size, T)
     euc_d = torch.square(p_diff).sum(2) # shape (n, n_kernel, kernel_size, T)
 
+    if compute_gradients:
+        p_diff /= torch.sqrt(euc_d[:,:, None, :, :] + eps)
+
     # compute dtw
     euc_d[:,:,0,:] = torch.cumsum(euc_d[:,:,0,:], dim=2)
     euc_d[:,:,:,0] = torch.cumsum(euc_d[:,:,:,0], dim=2)
 
     if compute_gradients:
         # p_diff now contains the partial derivatives of DTW[n, k, i, j] wrt K[k, d, i] (dims (n, k, d, i, j))
-        p_diff = p_diff / torch.sqrt(euc_d[:,:, None, :, :] + eps)
         
         grads = dtw_compute_full(euc_d, p_diff, x.shape[1], w) # dims (n, k, d, i, i, j)
         
