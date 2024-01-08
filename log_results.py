@@ -1,6 +1,16 @@
 import os
-
 from argparse import ArgumentParser
+
+'''
+    Usage:
+        python log_results.py --dir DIRECTORY --out_name FILENAME
+
+    Searchs for FILENAME in every directory inside DIRECTORY
+    FILENAME is a text file containing a python dict with keys containing "val"
+    
+    For each directory prints the name of the directory, which is assumed to be the modelname
+    along with the corresponding "val" metrics inside FILENAME.
+'''
 
 def main(args):
     dir_list = os.listdir(args.dir)
@@ -22,12 +32,14 @@ def main(args):
     entries.sort()
 
     MODEL_NAME_LINE = 50
-    print(f"{'MODELNAME':>65}", end=" |")
+    print(f"{'MODELNAME':>55}", end=" |")
     for entry in entries:
         print(f"{entry:>10}", end="")
-    print("\n" + "-"*150)
+    print("\n" + "-"*110)
 
-    for model_name, entry_dict in loaded.items():
+    loaded_sorted_names = list(loaded.keys())
+    loaded_sorted_names.sort()
+    for model_name in loaded_sorted_names:
         name_parts = []
         name = model_name
         while len(name)>0:
@@ -40,11 +52,11 @@ def main(args):
         
         for i, part in enumerate(name_parts):
             e = " |" if i==(len(name_parts)-1) else " |\n"
-            print(f"{part:>65}", end=e)
+            print(f"{part:>55}", end=e)
 
         for entry in entries:
-            print(f"{entry_dict[entry]:>10.5f}", end="")
-        print("\n" + "-"*150)
+            print(f"{loaded[model_name][entry]:>10.5f}", end="")
+        print("\n" + "-"*110)
 
 
 if __name__ == "__main__":
