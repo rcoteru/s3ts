@@ -20,7 +20,7 @@ def main(args):
             "seed": 42
         })
     
-    with open(os.path.join(ROOT_DIR, modelname, "results.dict"), "w") as f:
+    with open(os.path.join(ROOT_DIR, modelname.replace("|", "_").replace(",", "_"), "results.dict"), "w") as f:
         f.write(str({**data, **args.__dict__}))
     
     print(data)
