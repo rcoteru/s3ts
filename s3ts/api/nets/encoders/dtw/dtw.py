@@ -18,16 +18,20 @@ def dtw_compute_full(dtw: torch.Tensor, dist_grad: torch.Tensor, dim: int, w: fl
 
     for i in range(1, len_pattern): # pl
         for j in range(1, len_window): # ws
-            value = torch.minimum(w * torch.minimum(dtw[:, :, i, j-1], dtw[:, :, i-1, j-1]), dtw[:, :, i-1, j])
-            temp_1 = dtw[:, :, i, j-1] < dtw[:, :, i-1, j-1] # path (i, j-1) or (i-1, j)
-            temp_2 = w * dtw[:, :, i, j-1] < dtw[:, :, i-1, j] # path (i, j-1) or (i-1, j-1)
-            temp_3 = w * dtw[:, :, i-1, j-1] < dtw[:, :, i-1, j] # path (i-1, j-1) or (i-1, j)
+            temp_1 = dtw[:, :, i, j-1] < dtw[:, :, i-1, j-1] # path not (i-1, j-1)
+            temp_2 = w * dtw[:, :, i, j-1] < dtw[:, :, i-1, j] # path not (i-1, j)
 
-            dtw[:, :, i, j] += value
+            pathijm1 = temp_1 & temp_2
+            pathim1jm1 = (~temp_1) & temp_2
+            pathim1j = temp_1 & (~temp_2)
 
-            grads[temp_1 & temp_2][:, :i, i, j] += w * grads[temp_1 & temp_2][:, :i, i, j-1]
-            grads[temp_1 & temp_3][:, :i, i, j] += grads[temp_1 & temp_3][:, :i, i-1, j]
-            grads[temp_2 & temp_3][:, :i, i, j] += w * grads[temp_2 & temp_3][:, :i, i-1, j-1]
+            dtw[pathijm1][:, i, j] += w * dtw[pathijm1][:, i, j-1]
+            dtw[pathim1jm1][:, i, j] += dtw[pathim1jm1][:, i-1, j]
+            dtw[pathim1j][:, i, j] += w * dtw[pathim1j][:, i-1, j-1]
+
+            grads[pathijm1][:, :, :, i, j] += w * grads[pathijm1][:, :, :, i, j-1]
+            grads[pathim1jm1][:, :, :, i, j] += grads[pathim1jm1][:, :, :, i-1, j]
+            grads[pathim1j][:, :, :, i, j] += w * grads[pathim1j][:, :, :, i-1, j-1]
 
     return grads
 
