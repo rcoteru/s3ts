@@ -3,9 +3,8 @@ import torch
 @torch.jit.script
 def dtw_compute_full_per_channel(dtw: torch.Tensor, dist_grad: torch.Tensor, dim: int, w: float) -> torch.Tensor:
     '''
-        dtw of shape (n, k, pattern_len, window_size)
+        dtw of shape (n, k, dims, pattern_len, window_size)
         dist_grad of shape (n, k, dims, pattern_len, window_size)
-        grad of shape (n, k, dims, pattern_len)
     '''
     n, k, d, len_pattern, len_window = dtw.shape
     # very big tensor
@@ -48,14 +47,14 @@ def dtw_compute_no_grad_per_channel(dtw: torch.Tensor, w: float) -> None:
     
 @torch.jit.script
 def dtw_fast_full_per_channel(x: torch.Tensor, y: torch.Tensor, w: float, eps: float = 1e-5, compute_gradients: bool=True):
-    # shape of x (n, dim, x_len) y (m, dim, y_len)
+    # shape of x (n, dim, x_len) y (m, y_len)
 
-    # performs convolution-like operation, for each kernel the DF
-    # (of shape (kernel_size, T)) is computed, then summed across channels
+    # performs convolution-like operation, for each kernel, for each dim the DF
+    # (of shape (kernel_size, T)) is computed
     # x has shape (batch, c, time_dimension)
 
     # compute pairwise diffs (squared)
-    p_diff = x[:,None,:,None,:] - y[None,:,:,:,None] # shape (n, n_kernel, d, Kernel_size, T)
+    p_diff = x[:,None,:,None,:] - y[None,:,None,:,None] # shape (n, n_kernel, d, Kernel_size, T)
     euc_d = torch.abs(p_diff) # shape (n, n_kernel, d, kernel_size, T)
 
     # compute dtw
@@ -91,4 +90,4 @@ class torch_dtw_per_channel(torch.autograd.Function):
         # dtw_grad dims (n, k, d, i, j) p_diff dims (n, k, d, i, i, j)
         p_diff, = ctx.saved_tensors
         mult = (p_diff * dtw_grad[:, :, :, :, None, :]) # dims (n, k, d, i, i, j)
-        return None, mult.sum(dim=(-2, -1)).mean(dim=0), None
+        return None, mult.sum(dim=(-2, -1)).mean(dim=(0, 2)), None

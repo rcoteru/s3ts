@@ -28,7 +28,7 @@ class DTWLayerPerChannel(torch.nn.Module):
             self.l_out = l_out
 
         self.w: torch.float32 = rho ** (1/l_patts)
-        self.patts = torch.nn.Parameter(torch.randn(n_patts, d_patts, l_patts))
+        self.patts = torch.nn.Parameter(torch.randn(n_patts, l_patts))
     
     def forward(self, x):
         y = torch_dtw_per_channel.apply(x, self.patts, self.w)[0][:,:,:,:,-self.l_out:]
