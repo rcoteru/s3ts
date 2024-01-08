@@ -21,22 +21,28 @@ def main(args):
     entries = list(filter(lambda x: "val" in x, entries))
     entries.sort()
 
+    MODEL_NAME_LINE = 50
     print(f"{'MODELNAME':>65}", end=" |")
-    for entry in list(set(entries)):
+    for entry in entries:
         print(f"{entry:>10}", end="")
     print("\n" + "-"*150)
 
-    MODEL_NAME_LINE = 60
-
     for model_name, entry_dict in loaded.items():
+        name_parts = []
+        name = model_name
+        while len(name)>0:
+            if len(name)>MODEL_NAME_LINE:
+                name_parts.append(name[:MODEL_NAME_LINE])
+                name = name[MODEL_NAME_LINE:]
+            else:
+                name_parts.append(name)
+                break
+        
+        for i, part in enumerate(name_parts):
+            e = " |" if i==(len(name_parts)-1) else " |\n"
+            print(f"{part:>65}", end=e)
 
-        i=MODEL_NAME_LINE
-        for i in range(MODEL_NAME_LINE, len(model_name), MODEL_NAME_LINE):
-            print(f"{model_name[(i-MODEL_NAME_LINE):i]:>65}", end=" |\n")
-        last_part = model_name[i:]
-        print(f"{last_part:>65}", end=" |")
-
-        for entry in list(set(entries)):
+        for entry in entries:
             print(f"{entry_dict[entry]:>10.5f}", end="")
         print("\n" + "-"*150)
 
