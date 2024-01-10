@@ -125,9 +125,7 @@ def load_dmdataset(
         label_mode = 1,
         use_medoids = True,
         overlap = -1):
-    
-    assert pattern_size <= window_size
-    
+        
     ds = load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize)
         
     print(f"Loaded dataset {dataset_name} with a total of {len(ds)} observations for window size {window_size}")
