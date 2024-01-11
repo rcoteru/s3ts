@@ -28,11 +28,13 @@ def main(args):
     best_metric = -float("inf")
 
     for checkpoint_file in os.listdir(os.path.join(args.model_dir, "checkpoints")):
+        print("Validating", os.path.join(args.model_dir, "checkpoints", checkpoint_file))
         model = WrapperModel.load_from_checkpoint(
             checkpoint_path=os.path.join(args.model_dir, "checkpoints", checkpoint_file),
-            hparams_file=hparam_path
+            hparams_file=hparam_path,
+            voting={"n": args.voting, "rho": train_args.rho}
         )
-        print(summarize(model, 1))
+        # print(summarize(model, 1))
         data = trainer.validate(model=model, datamodule=dm)
         print(data[0])
 
@@ -44,7 +46,8 @@ def main(args):
     print("------------ Testing the best model ------------")
     model = WrapperModel.load_from_checkpoint(
         checkpoint_path=os.path.join(args.model_dir, "checkpoints", best_checkpoint),
-        hparams_file=hparam_path
+        hparams_file=hparam_path,
+        voting={"n": args.voting, "rho": train_args.rho}
     )
     print(summarize(model, 1))
     data = trainer.test(model=model, datamodule=dm)
@@ -62,6 +65,8 @@ if __name__ == "__main__":
         help="Model directory")
     parser.add_argument("--track_metric", type=str,
         help="Tracks the following metric to retrieve the best validation checkpoint")
+    parser.add_argument("--voting", type=int, default=1,
+        help="Number of observations to use while voting the prediction")
 
     args = parser.parse_args()
     

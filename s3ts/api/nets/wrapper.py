@@ -138,7 +138,9 @@ class WrapperModel(LightningModule):
         self.voting = None
         if voting["n"] > 1:
             self.voting = voting
-            self.voting["weights"] = (self.voting["rho"] ** (1/self.wdw_len)) ** torch.arange(self.voting["n"], 0, -1)
+            self.voting["weights"] = (self.voting["rho"] ** (1/self.wdw_len)) ** torch.arange(self.voting["n"] - 1, -1, -1)
+
+        self.previous_predictions = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward pass. """
@@ -174,15 +176,20 @@ class WrapperModel(LightningModule):
         if self.task == "cls":
             loss = F.cross_entropy(output, batch["label"])
 
-            predictions = torch.argmax(output, dim=1)
+            if stage == "train" or self.voting is None:
+                predictions = torch.argmax(output, dim=1)
             if stage != "train" and not self.voting is None:
                 pred_prob = torch.softmax(output, dim=1)
-                # predictions_one_hot = torch.eye(self.n_classes)[predictions] # equivalent to F.one_hot(predictions, self.n_classes).float()
-                predictions_weighted = torch.conv2d(
-                    F.pad(pred_prob[None, None, ...], (0, 0, self.voting["n"]-1, 0)),
-                    self.voting["weights"][None, None, :, None]
-                )[0, 0]
-                predictions = torch.argmax(predictions_weighted, dim=1)
+
+                if self.previous_predictions is None:
+                    pred_ = torch.cat((torch.zeros((self.voting["n"]-1, self.n_classes)), pred_prob), dim=0)
+                else:
+                    pred_ = torch.cat((self.previous_predictions, pred_prob), dim=0)
+                
+                self.previous_predictions = pred_prob[-(self.voting["n"]-1):,:]
+
+                predictions_weighted = torch.conv2d(pred_[None, None, ...], self.voting["weights"][None, None, :, None])[0, 0]
+                predictions = predictions_weighted.argmax(dim=1)
 
             self.__getattr__(f"{stage}_cm").update(predictions, batch["label"])
             if stage != "train":
