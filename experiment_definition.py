@@ -5,19 +5,21 @@ baseArguments = {
         [21]
     ],
     "lr": 0.001,
+    "n_val_subjects": 5,
     "encoder_architecture": "cnn_gap",
     "encoder_features": 20,
     "decoder_architecture": "mlp",
     "decoder_features": 32,
     "decoder_layers": 1,
-    "window_size": 48,
-    "window_stride": 1,
+    "window_size": 16,
+    "window_stride": [2, 4],
     "batch_size": 128,
     "label_mode": 1,
     "voting": 1,
     "rho": 0.1,
     "overlap": -1,
-    "max_epochs": 30
+    "max_epochs": 30,
+    "training_dir": "training_2"
 }
 
 imgExperiments = {
@@ -25,7 +27,7 @@ imgExperiments = {
     "num_medoids": 1,
     "compute_n": 300,
     "use_medoids": [True, False],
-    "pattern_size": [16, 32, 48]
+    "pattern_size": [32, 48]
 }
 
 dtwExperiments = {
@@ -58,4 +60,4 @@ mtffExperiments = {
 RAM = 32
 CPUS = 16
 
-experiments = [imgExperiments, dtwExperiments, dtwcExperiments, tsExperiments, gasfExperiments, gadfExperiments, mtffExperiments]
+experiments = [imgExperiments] #, dtwExperiments, dtwcExperiments, tsExperiments, gasfExperiments, gadfExperiments, mtffExperiments]

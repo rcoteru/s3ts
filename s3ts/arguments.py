@@ -1,6 +1,6 @@
 
 def get_model_name(args):
-    modelname = f"{args.mode}|{args.dataset}," + '-'.join([str(subject) for subject in args.subjects_for_test]) + "|" \
+    modelname = f"{args.mode}|{args.dataset}," + '-'.join([str(subject) for subject in args.subjects_for_test]) + "|{args.n_val_subjects}|" \
                 f"{args.window_size},{args.window_stride}|bs{args.batch_size}_lr{args.lr}|" + \
                 f"{args.encoder_architecture}{args.encoder_features}|" + \
                 f"{args.decoder_architecture}{args.decoder_features},{args.decoder_layers}|" + \
@@ -36,6 +36,6 @@ def get_command(args):
         command += f"--mtf_bins {args.mtf_bins} "
 
     command += f"--num_workers {args.num_workers} --max_epochs {args.max_epochs} --normalize --reduce_imbalance "
-    command += f"--training_dir {args.training_dir}"
+    command += f"--training_dir {args.training_dir} --n_val_subjects {args.n_val_subjects}"
 
     return command
