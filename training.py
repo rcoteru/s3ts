@@ -6,8 +6,6 @@ from s3ts.api.nets.methods import train_model
 
 from s3ts.arguments import get_model_name
 
-ROOT_DIR = "training"
-
 def main(args):
     dm = load_dm(args)
 
@@ -15,13 +13,13 @@ def main(args):
     model = get_model(modelname, args, dm)
     
     model, data = train_model(dm, model, max_epochs=args.max_epochs, pl_kwargs={
-            "default_root_dir": ROOT_DIR,
+            "default_root_dir": args.training_dir,
             "accelerator": "auto",
             "seed": 42
         })
     
-    with open(os.path.join(ROOT_DIR, modelname.replace("|", "_").replace(",", "_"), "results.dict"), "w") as f:
-        f.write(str({**data, **args.__dict__}))
+    with open(os.path.join(args.training_dir, modelname.replace("|", "_").replace(",", "_"), "results.dict"), "w") as f:
+        f.write(str({**data, **args.__dict__, "name": modelname}))
     
     print(data)
 

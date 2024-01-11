@@ -70,6 +70,8 @@ def get_parser():
         help="Overlap of observations between training and test examples, default -1 for maximum overlap (equivalent to overlap set to window size -1)")
     parser.add_argument("--mtf_bins", default=10, type=int, 
         help="Number of bins for mtf computation")
+    parser.add_argument("--training_dir", default="training", type=str, 
+        help="Directory of model checkpoints")
 
     return parser
 

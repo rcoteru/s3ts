@@ -35,6 +35,7 @@ def get_command(args):
     if args.mode == "mtf":
         command += f"--mtf_bins {args.mtf_bins} "
 
-    command += f"--num_workers {args.num_workers} --max_epochs {args.max_epochs} --normalize --reduce_imbalance"
+    command += f"--num_workers {args.num_workers} --max_epochs {args.max_epochs} --normalize --reduce_imbalance "
+    command += f"--training_dir {args.training_dir}"
 
     return command
