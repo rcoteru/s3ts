@@ -239,7 +239,7 @@ def get_model(name, args, dm):
         dsrc=args.mode, arch=args.encoder_architecture, dec_arch=args.decoder_architecture,
         task="cls", lr=args.lr, enc_feats=args.encoder_features, 
         dec_feats=args.decoder_features, dec_layers=args.decoder_layers,
-        voting={"n": args.voting, "rho": args.rho})
+        voting={"n": args.voting, "rho": args.rho}, args=str(args.__dict__))
     
     return model
 

@@ -6,6 +6,8 @@ from s3ts.api.nets.methods import train_model
 
 from s3ts.arguments import get_model_name
 
+from pytorch_lightning import Trainer, seed_everything
+
 def main(args):
     dm = load_dm(args)
 
@@ -28,6 +30,8 @@ if __name__ == "__main__":
 
     parser = get_parser()
     args = parser.parse_args()
+
+    seed_everything(42)
     
     print(args)
     main(args)

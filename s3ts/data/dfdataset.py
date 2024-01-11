@@ -211,8 +211,8 @@ class LDFDataset(StreamingFramesDM):
 
         total_observations = self.dfds.stsds.indices.shape[0]
         train_indices = np.arange(total_observations)[data_split["train"](self.dfds.stsds.indices)][::skip]
-        test_indices = np.arange(total_observations)[data_split["test"](self.dfds.stsds.indices)][::skip]
-        val_indices = np.arange(total_observations)[data_split["val"](self.dfds.stsds.indices)][::skip]
+        test_indices = np.arange(total_observations)[data_split["test"](self.dfds.stsds.indices)]
+        val_indices = np.arange(total_observations)[data_split["val"](self.dfds.stsds.indices)]
 
         if reduce_train_imbalance:
             train_indices = reduce_imbalance(train_indices, self.dfds.stsds.SCS[self.dfds.stsds.indices[train_indices]], seed=random_seed)

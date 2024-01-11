@@ -44,7 +44,7 @@ default_voting = {"n": 1, "w": 1}
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 def create_model_from_DM(dm:  StreamingFramesDM, dsrc: str, arch: str, dec_arch: str, task: str, name: str = None,
-        enc_feats: int = None, dec_feats: int = None, dec_layers: int = None, lr: float = default_lr, voting: dict = default_voting
+        enc_feats: int = None, dec_feats: int = None, dec_layers: int = None, lr: float = default_lr, voting: dict = default_voting, args: str = None
         ) -> WrapperModel:
     
     # use defaults values if needed
@@ -71,7 +71,8 @@ def create_model_from_DM(dm:  StreamingFramesDM, dsrc: str, arch: str, dec_arch:
         dec_feats=dec_feats,
         dec_layers=dec_layers,
         lr=lr,
-        voting=voting)
+        voting=voting,
+        args=args)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 

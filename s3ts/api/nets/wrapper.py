@@ -62,7 +62,7 @@ class WrapperModel(LightningModule):
         n_dims, n_classes, n_patterns, l_patterns,
         wdw_len, wdw_str, sts_str,
         enc_feats, dec_feats, dec_layers, lr, voting,
-        name=None) -> None:
+        name=None, args=None) -> None:
 
         """ Wrapper for the PyTorch models used in the experiments. """
 
