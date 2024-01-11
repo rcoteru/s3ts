@@ -137,9 +137,6 @@ def load_dmdataset(
 
     ds = load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize)
 
-    if pattern_size > actual_window_size:
-        ds.wsize = actual_window_size
-
     print(f"Loaded dataset {dataset_name} with a total of {len(ds)} observations for window size {ds.wsize}")
 
     # load medoids if already computed
@@ -161,6 +158,9 @@ def load_dmdataset(
         meds[0,:] = np.linspace(-1, 1, pattern_size)
         meds[1,:] = np.linspace(1, -1, pattern_size)
         meds[2,:] = 0
+
+    if pattern_size > actual_window_size:
+        ds.wsize = actual_window_size
 
     print("Computing dissimilarity frames...")
     dfds = DFDataset(ds, patterns=meds, rho=rho, dm_transform=None, cached=True, ram=False)
