@@ -28,7 +28,7 @@ def main(args):
         for entry, data in entry_dict.items():
             entries.append(entry)
     entries = list(set(entries))
-    entries = list(filter(lambda x: "val" in x, entries))
+    entries = list(filter(lambda x: ("val" in x) or ("test" in x), entries))
     entries.sort()
 
     MODEL_NAME_LINE = 85
