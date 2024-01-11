@@ -1,6 +1,6 @@
 
 def get_model_name(args):
-    modelname = f"{args.mode}|{args.dataset}," + '-'.join([str(subject) for subject in args.subjects_for_test]) + "|{args.n_val_subjects}|" \
+    modelname = f"{args.mode}|{args.dataset}," + '-'.join([str(subject) for subject in args.subjects_for_test]) + f"|{args.n_val_subjects}|" \
                 f"{args.window_size},{args.window_stride}|bs{args.batch_size}_lr{args.lr}|" + \
                 f"{args.encoder_architecture}{args.encoder_features}|" + \
                 f"{args.decoder_architecture}{args.decoder_features},{args.decoder_layers}|" + \
