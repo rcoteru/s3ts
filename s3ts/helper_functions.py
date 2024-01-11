@@ -72,6 +72,8 @@ def get_parser():
         help="Number of bins for mtf computation")
     parser.add_argument("--training_dir", default="training", type=str, 
         help="Directory of model checkpoints")
+    parser.add_argument("--n_val_subjects", default=1, type=int, 
+        help="Number of subjects for validation")
 
     return parser
 
@@ -126,7 +128,8 @@ def load_dmdataset(
         num_medoids = 1,
         label_mode = 1,
         use_medoids = True,
-        overlap = -1):
+        overlap = -1,
+        n_val_subjects = 1):
 
     actual_window_size = window_size
     if pattern_size > window_size:
@@ -162,7 +165,7 @@ def load_dmdataset(
     print("Computing dissimilarity frames...")
     dfds = DFDataset(ds, patterns=meds, rho=rho, dm_transform=None, cached=True, ram=False)
 
-    data_split = split_by_test_subject(ds, subjects_for_test)
+    data_split = split_by_test_subject(ds, subjects_for_test, n_val_subjects)
 
     if normalize:
         # get average values of the DM
@@ -178,8 +181,6 @@ def load_dmdataset(
 
     dm = LDFDataset(dfds, data_split=data_split, batch_size=batch_size, random_seed=42, 
         num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance, label_mode=label_mode, overlap=overlap)
-
-    print(f"Using {len(dm.ds_train)} observations for training and {len(dm.ds_val)} observations for validation and test")
 
     return dm
 
@@ -198,19 +199,18 @@ def load_tsdataset(
         label_mode = 1,
         overlap = -1,
         mode = None,
-        mtf_bins = 50):
+        mtf_bins = 50,
+        n_val_subjects = 1):
     
     ds = load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize)
         
     print(f"Loaded dataset {dataset_name} with a total of {len(ds)} observations for window size {window_size}")
 
-    data_split = split_by_test_subject(ds, subjects_for_test)
+    data_split = split_by_test_subject(ds, subjects_for_test, n_val_subjects)
 
     dm = LSTSDataset(ds, data_split=data_split, batch_size=batch_size, random_seed=42, 
         num_workers=num_workers, reduce_train_imbalance=reduce_train_imbalance, label_mode=label_mode, overlap=overlap, mode=mode, mtf_bins=mtf_bins)
     dm.l_patterns = pattern_size
-
-    print(f"Using {len(dm.ds_train)} observations for training and {len(dm.ds_val)} observations for validation and test")
 
     return dm
 
@@ -221,15 +221,17 @@ def load_dm(args):
             rho=args.rho, batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
             compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
-            label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids, overlap=args.overlap)
+            label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids, overlap=args.overlap, n_val_subjects=args.n_val_subjects)
     elif args.mode in ["ts", "dtw", "dtw_c", "mtf", "gasf", "gadf"]:
         dm = load_tsdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, 
             batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size,
             subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
-            label_mode=args.label_mode, overlap=args.overlap, mode=args.mode, mtf_bins=args.mtf_bins)
-        
+            label_mode=args.label_mode, overlap=args.overlap, mode=args.mode, mtf_bins=args.mtf_bins, n_val_subjects=args.n_val_subjects)
+
+    print(f"Using {len(dm.ds_train)} observations for training, {len(dm.ds_val)} for validation and {len(dm.ds_test)} observations for test")
+  
     return dm
 
 def get_model(name, args, dm):

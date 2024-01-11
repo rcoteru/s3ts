@@ -176,9 +176,10 @@ class WrapperModel(LightningModule):
 
             predictions = torch.argmax(output, dim=1)
             if stage != "train" and not self.voting is None:
-                predictions_one_hot = torch.eye(self.n_classes)[predictions] # equivalent to F.one_hot(predictions, self.n_classes).float()
+                pred_prob = torch.softmax(output, dim=1)
+                # predictions_one_hot = torch.eye(self.n_classes)[predictions] # equivalent to F.one_hot(predictions, self.n_classes).float()
                 predictions_weighted = torch.conv2d(
-                    F.pad(predictions_one_hot[None, None, ...], (0, 0, self.voting["n"]-1, 0)),
+                    F.pad(pred_prob[None, None, ...], (0, 0, self.voting["n"]-1, 0)),
                     self.voting["weights"][None, None, :, None]
                 )[0, 0]
                 predictions = torch.argmax(predictions_weighted, dim=1)
@@ -216,7 +217,7 @@ class WrapperModel(LightningModule):
         return self._inner_step(batch, stage="val")
 
     def test_step(self, batch: dict[str: torch.Tensor], batch_idx: int):
-        """ Validation step. """
+        """ Test step. """
         return self._inner_step(batch, stage="test")
     
     def log_metrics(self, stage):

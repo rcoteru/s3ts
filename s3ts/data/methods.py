@@ -83,30 +83,24 @@ def return_indices_test(x, subjects, subject_splits):
 
 # series splitting functions
 
-def split_by_test_subject(sts, subject):
+def split_by_test_subject(sts, test_subject, n_val_subjects):
     if hasattr(sts, "subject_indices"):
         subject_splits = sts.subject_indices
     else:
         subject_splits = list(sts.splits)
+
+    val_subject_indices = np.arange(len(subject_splits) - 1)
+    val_subjects_selected = list(np.random.choice(val_subject_indices, n_val_subjects, replace=False))
     
-    if isinstance(subject, list):
+    if not isinstance(test_subject, list):
+        test_subject = [test_subject]
 
-        for s in subject:
-            if s > len(subject_splits) - 1:
-                raise Exception(f"No subject with index {s}")
+    for s in test_subject:
+        if s > len(subject_splits) - 1:
+            raise Exception(f"No subject with index {s}")
 
-        return {
-            "train": lambda x: return_indices_train(x, subjects=subject, subject_splits=subject_splits),
-            "val": lambda x: return_indices_test(x, subjects=subject, subject_splits=subject_splits),
-            "test": lambda x: return_indices_test(x, subjects=subject, subject_splits=subject_splits),
-        }
-
-    else:
-        if subject > len(subject_splits) - 1:
-            raise Exception(f"No subject with index {subject}")
-        
-        return {
-            "train": lambda x: (x<subject_splits[subject]) | (x>subject_splits[subject+1]),
-            "val": lambda x: (x>subject_splits[subject]) & (x<subject_splits[subject+1]),
-            "test": lambda x: (x>subject_splits[subject]) & (x<subject_splits[subject+1])
-        }
+    return {
+        "train": lambda x: return_indices_train(x, subjects=test_subject + val_subjects_selected, subject_splits=subject_splits),
+        "val": lambda x: return_indices_test(x, subjects=val_subjects_selected, subject_splits=subject_splits),
+        "test": lambda x: return_indices_test(x, subjects=test_subject, subject_splits=subject_splits),
+    }

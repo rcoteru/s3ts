@@ -89,7 +89,13 @@ def train_model(
     metrics = metric_settings[model.task]
 
     # set up the trainer
-    ckpt = ModelCheckpoint(monitor=metrics['target'], mode=metrics["mode"])    
+    ckpt = ModelCheckpoint(
+        monitor=metrics['target'], 
+        mode=metrics["mode"],
+        save_top_k=-1,
+        filename='{epoch}-{step}-{val_re:.2f}'
+    )
+
     tr = Trainer(default_root_dir=pl_kwargs["default_root_dir"], 
     accelerator=pl_kwargs["accelerator"], callbacks=[ckpt], max_epochs=max_epochs,
     logger=TensorBoardLogger(save_dir=pl_kwargs["default_root_dir"], name=model.name.replace("|", "_").replace(",", "_")))
@@ -101,7 +107,7 @@ def train_model(
     model = model.load_from_checkpoint(ckpt.best_model_path)
 
     # run the validation with the final weights
-    data = tr.validate(model, datamodule=dm)
+    data = tr.test(model, datamodule=dm)
 
     return model, data[0]
 
