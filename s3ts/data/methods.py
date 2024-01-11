@@ -83,14 +83,16 @@ def return_indices_test(x, subjects, subject_splits):
 
 # series splitting functions
 
-def split_by_test_subject(sts, test_subject, n_val_subjects):
+def split_by_test_subject(sts, test_subject, n_val_subjects, seed=42):
     if hasattr(sts, "subject_indices"):
         subject_splits = sts.subject_indices
     else:
         subject_splits = list(sts.splits)
 
+    rng = np.random.default_rng(seed)
+
     val_subject_indices = np.arange(len(subject_splits) - 1)
-    val_subjects_selected = list(np.random.choice(val_subject_indices, n_val_subjects, replace=False))
+    val_subjects_selected = list(rng.choice(val_subject_indices, n_val_subjects, replace=False))
     
     if not isinstance(test_subject, list):
         test_subject = [test_subject]
