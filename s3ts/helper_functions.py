@@ -127,10 +127,17 @@ def load_dmdataset(
         label_mode = 1,
         use_medoids = True,
         overlap = -1):
-        
+
+    actual_window_size = window_size
+    if pattern_size > window_size:
+        window_size = pattern_size
+
     ds = load_dataset(dataset_name, dataset_home_directory, window_size, window_stride, normalize)
-        
-    print(f"Loaded dataset {dataset_name} with a total of {len(ds)} observations for window size {window_size}")
+
+    if pattern_size > actual_window_size:
+        ds.wsize = actual_window_size
+
+    print(f"Loaded dataset {dataset_name} with a total of {len(ds)} observations for window size {ds.wsize}")
 
     # load medoids if already computed
     # if not os.path.exists(os.path.join(dataset_home_directory, dataset_name, f"meds{window_size}.npz")):
