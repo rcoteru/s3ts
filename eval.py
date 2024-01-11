@@ -24,15 +24,31 @@ def main(args):
     trainer = Trainer()
     dm = load_dm(train_args)
 
-    # TODO best checkpoint path is saved
+    best_checkpoint = None
+    best_metric = -float("inf")
+
     for checkpoint_file in os.listdir(os.path.join(args.model_dir, "checkpoints")):
         model = WrapperModel.load_from_checkpoint(
             checkpoint_path=os.path.join(args.model_dir, "checkpoints", checkpoint_file),
             hparams_file=hparam_path
         )
         print(summarize(model, 1))
-        data = trainer.test(model=model, datamodule=dm)
+        data = trainer.validate(model=model, datamodule=dm)
         print(data[0])
+
+        if data[0][args.track_metric] > best_metric:
+            best_metric = data[0][args.track_metric]
+            best_checkpoint = checkpoint_file
+
+    # test the best checkpoint
+    print("------------ Testing the best model ------------")
+    model = WrapperModel.load_from_checkpoint(
+        checkpoint_path=os.path.join(args.model_dir, "checkpoints", best_checkpoint),
+        hparams_file=hparam_path
+    )
+    print(summarize(model, 1))
+    data = trainer.test(model=model, datamodule=dm)
+    print(data[0])
 
     return 0
     
@@ -44,6 +60,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--model_dir", type=str,
         help="Model directory")
+    parser.add_argument("--track_metric", type=str,
+        help="Tracks the following metric to retrieve the best validation checkpoint")
 
     args = parser.parse_args()
     
