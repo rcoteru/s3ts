@@ -54,6 +54,9 @@ class DFDataset(Dataset):
             hash = hashlib.sha1(patterns.data)
             self.cache_dir = os.path.join(os.getcwd(), "cache" + hash.hexdigest())
 
+            with open(os.path.join(self.cache_dir, "pattern.npz"), "wb") as f:
+                np.save(f, self.patterns)
+
             if not os.path.exists(self.cache_dir):
                 os.mkdir(self.cache_dir)
             elif len(os.listdir(self.cache_dir)) == len(self.stsds.splits)-1:
@@ -65,10 +68,10 @@ class DFDataset(Dataset):
                 if not os.path.exists(save_path):
                     self._compute_dm(patterns, self.stsds.splits[s:s+2], save_path)
 
-                if self.ram:
-                    self.DM.append(torch.from_numpy(np.load(save_path)))
-                else:
-                    self.DM.append(torch.from_numpy(np.load(save_path, mmap_mode="r")))
+                # if self.ram:
+                #     self.DM.append(torch.from_numpy(np.load(save_path)))
+                # else:
+                #     self.DM.append(torch.from_numpy(np.load(save_path, mmap_mode="r")))
         
         else: # i.e. not cached
             for s in range(self.stsds.splits.shape[0] - 1):
@@ -110,7 +113,12 @@ class DFDataset(Dataset):
         first = id - self.stsds.wsize*self.stsds.wstride - self.stsds.splits[s]
         last = id - self.stsds.splits[s]
 
-        dm = self.DM[s][first:last:self.stsds.wstride] * 1
+        if self.cached:
+            dm_np = np.load(os.path.join(self.cache_dir, f"part{s}.npz"), mmap_mode="r")[first:last:self.stsds.wstride] * 1
+            dm = torch.from_numpy(dm_np)
+        else:
+            dm = self.DM[s][first:last:self.stsds.wstride] * 1
+
         dm = torch.permute(dm, (1, 2, 0)) # recover the dimensions of dm (n_frames, patt_len, n)
 
         if not self.dm_transform is None:
