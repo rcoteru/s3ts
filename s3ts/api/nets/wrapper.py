@@ -272,10 +272,10 @@ class WrapperModel(LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": ReduceLROnPlateau(optimizer, 
-                    mode=mode, factor=np.sqrt(0.1), patience=5, min_lr=0.5e-7),
+                    mode=mode, factor=np.sqrt(0.1), patience=2, min_lr=0.5e-7),
                 "interval": "epoch",
                 "monitor": monitor,
-                "frequency": 10
+                "frequency": 1
                 # If "monitor" references validation metrics, then "frequency" should be set to a
                 # multiple of "trainer.check_val_every_n_epoch".
             },
