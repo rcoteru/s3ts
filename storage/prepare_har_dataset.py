@@ -134,7 +134,7 @@ def prepare_harth(dataset_dir):
             splits = []
             last = 0
             for i in range(len(ds) - 1):
-                if (ds["dt"][i + 1] - ds["dt"][i]) > 25:
+                if (ds["dt"][i + 1] - ds["dt"][i]) > 100: # I get the same number of splits for 25ms, 50ms or 100 ms
                     splits.append(ds.loc[last:i])
                     last = i + 1
             splits.append(ds.loc[last:len(ds)])

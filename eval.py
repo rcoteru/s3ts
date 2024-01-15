@@ -27,7 +27,7 @@ def main(args):
     best_checkpoint = None
     best_metric = -float("inf")
 
-    for checkpoint_file in os.listdir(os.path.join(args.model_dir, "checkpoints")):
+    for checkpoint_file in sorted(os.listdir(os.path.join(args.model_dir, "checkpoints"))):
         print("Validating", os.path.join(args.model_dir, "checkpoints", checkpoint_file))
         model = WrapperModel.load_from_checkpoint(
             checkpoint_path=os.path.join(args.model_dir, "checkpoints", checkpoint_file),
