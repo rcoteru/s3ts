@@ -6,6 +6,7 @@
 
 # pl imports
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning import Trainer, seed_everything
 
@@ -98,7 +99,7 @@ def train_model(
     )
 
     tr = Trainer(default_root_dir=pl_kwargs["default_root_dir"], 
-    accelerator=pl_kwargs["accelerator"], callbacks=[ckpt], max_epochs=max_epochs,
+    accelerator=pl_kwargs["accelerator"], callbacks=[ckpt, LearningRateMonitor(logging_interval="epoch")], max_epochs=max_epochs,
     logger=TensorBoardLogger(save_dir=pl_kwargs["default_root_dir"], name=model.name.replace("|", "_").replace(",", "_")))
 
     # train the model
