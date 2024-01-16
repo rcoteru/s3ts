@@ -31,7 +31,7 @@ import torch.nn as nn
 import numpy as np
 import torch
 
-from s3ts.api.nets.auroc import torchAUROC
+# from s3ts.api.nets.auroc import torchAUROC
 
 dtw_mode = {"dtw": DTWLayer, "dtw_c": DTWLayerPerChannel}
 
@@ -257,11 +257,15 @@ class WrapperModel(LightningModule):
         self.log(f"{stage}_re", recall.nanmean(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
         self.log(f"{stage}_f1", f1.nanmean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
 
-        auc_per_class = torchAUROC(torch.concatenate(self.probabilities, dim=0), torch.concatenate(self.labels, dim=0), self.n_classes)
+        auc_per_class = tm.functional.auroc(
+            torch.concatenate(self.probabilities, dim=0), 
+            torch.concatenate(self.labels, dim=0), 
+            task="multiclass",
+            num_classes=self.n_classes)
         self.probabilities = []
         self.labels = []
 
-        self.log(f"{stage}_pr", auc_per_class.nanmean(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
+        self.log(f"{stage}_auroc", auc_per_class.nanmean(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
 
     def on_train_epoch_end(self):
         self.log_metrics("train")
