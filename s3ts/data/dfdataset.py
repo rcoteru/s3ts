@@ -78,6 +78,8 @@ class DFDataset(Dataset):
                 DM = self._compute_dm(patterns, self.stsds.splits[s:s+2], save_path=None)
                 self.DM.append(DM)
 
+        self.id_to_split = np.searchsorted(self.stsds.splits, self.stsds.indices) - 1
+
     # def __del__(self):
     #     if not self.cache_dir is None:
     #         for file in os.listdir(self.cache_dir):
@@ -108,8 +110,7 @@ class DFDataset(Dataset):
         id = self.stsds.indices[index]
 
         # identify the split of the index
-
-        s = np.argwhere(self.stsds.splits > id)[0, 0] - 1
+        s = self.id_to_split[index]
         first = id - self.stsds.wsize*self.stsds.wstride - self.stsds.splits[s]
         last = id - self.stsds.splits[s]
 
