@@ -26,7 +26,8 @@ class DFDataset(Dataset):
             rho: float = 0.1,
             dm_transform = None,
             ram: bool = False,
-            cached: bool = True) -> None:
+            cached: bool = True,
+            dataset_name: str = "") -> None:
         super().__init__()
 
         '''
@@ -52,19 +53,18 @@ class DFDataset(Dataset):
 
         if cached:
             hash = hashlib.sha1(patterns.data)
-            self.cache_dir = os.path.join(os.getcwd(), "cache" + hash.hexdigest())
+            self.cache_dir = os.path.join(os.getcwd(), f"cache_{dataset_name}_" + hash.hexdigest())
+
+            if not os.path.exists(self.cache_dir):
+                os.mkdir(self.cache_dir)
+            elif len(os.listdir(self.cache_dir)) == len(self.stsds.splits):
+                print("Loading cached dissimilarity frames if available...")
 
             with open(os.path.join(self.cache_dir, "pattern.npz"), "wb") as f:
                 np.save(f, self.patterns)
 
-            if not os.path.exists(self.cache_dir):
-                os.mkdir(self.cache_dir)
-            elif len(os.listdir(self.cache_dir)) == len(self.stsds.splits)-1:
-                print("Loading cached dissimilarity frames if available...")
-
             for s in range(self.stsds.splits.shape[0] - 1):
                 save_path = os.path.join(self.cache_dir, f"part{s}.npz")
-
                 if not os.path.exists(save_path):
                     self._compute_dm(patterns, self.stsds.splits[s:s+2], save_path)
 

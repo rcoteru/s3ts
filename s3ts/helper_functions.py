@@ -166,7 +166,7 @@ def load_dmdataset(
     ds.wstride = window_stride # restore original wstride
 
     print("Computing dissimilarity frames...")
-    dfds = DFDataset(ds, patterns=meds, rho=rho, dm_transform=None, cached=True, ram=False)
+    dfds = DFDataset(ds, patterns=meds, rho=rho, dm_transform=None, cached=True, ram=False, dataset_name=dataset_name)
 
     data_split = split_by_test_subject(ds, subjects_for_test, n_val_subjects)
 
