@@ -211,8 +211,7 @@ class WrapperModel(LightningModule):
                                                  self.flatten(batch["series"]))
 
         # log loss and metrics
-        on_step = True if stage == "train" else False
-        self.log(f"{stage}_loss", loss, on_epoch=True, on_step=on_step, prog_bar=True, logger=True)
+        self.log(f"{stage}_loss", loss, on_epoch=True, on_step=True, prog_bar=True, logger=True)
         if self.task == "cls":
             #self.log(f"{stage}_acc", self.__getattr__(f"{stage}_acc"), on_epoch=True, on_step=False, prog_bar=True, logger=True)
             #self.log(f"{stage}_f1", self.__getattr__(f"{stage}_f1"), on_epoch=True, on_step=False, prog_bar=False, logger=True)
