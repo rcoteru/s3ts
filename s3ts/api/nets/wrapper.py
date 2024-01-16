@@ -31,6 +31,8 @@ import torch.nn as nn
 import numpy as np
 import torch
 
+from s3ts.api.nets.auroc import torchAUROC
+
 dtw_mode = {"dtw": DTWLayer, "dtw_c": DTWLayerPerChannel}
 
 encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG, "res_gap": RES_GAP_IMG},
@@ -141,6 +143,8 @@ class WrapperModel(LightningModule):
             self.voting["weights"] = (self.voting["rho"] ** (1/self.wdw_len)) ** torch.arange(self.voting["n"] - 1, -1, -1)
 
         self.previous_predictions = None
+        self.probabilities = []
+        self.labels = []
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward pass. """
@@ -191,9 +195,15 @@ class WrapperModel(LightningModule):
                 predictions_weighted = torch.conv2d(pred_[None, None, ...], self.voting["weights"][None, None, :, None])[0, 0]
                 predictions = predictions_weighted.argmax(dim=1)
 
+                self.probabilities.append(pred_prob)
+                self.labels.append(batch["label"])
+
             self.__getattr__(f"{stage}_cm").update(predictions, batch["label"])
-            if stage != "train":
-                auroc = self.__getattr__(f"{stage}_auroc")(output, batch["label"])  
+            if stage != "train" and self.voting is None:
+                self.probabilities.append(torch.softmax(output, dim=1))
+                self.labels.append(batch["label"])
+
+                # auroc = self.__getattr__(f"{stage}_auroc")(output, batch["label"])  
         elif self.task == "reg":
             loss = F.mse_loss(output, batch["series"])
             mse = self.__getattr__(f"{stage}_mse")(output, batch["series"])
@@ -206,8 +216,9 @@ class WrapperModel(LightningModule):
         if self.task == "cls":
             #self.log(f"{stage}_acc", self.__getattr__(f"{stage}_acc"), on_epoch=True, on_step=False, prog_bar=True, logger=True)
             #self.log(f"{stage}_f1", self.__getattr__(f"{stage}_f1"), on_epoch=True, on_step=False, prog_bar=False, logger=True)
-            if stage != "train":
-                self.log(f"{stage}_auroc", self.__getattr__(f"{stage}_auroc"), on_epoch=True, on_step=False, prog_bar=True, logger=True)
+            # if stage != "train":
+            #     self.log(f"{stage}_auroc", self.__getattr__(f"{stage}_auroc"), on_epoch=True, on_step=False, prog_bar=True, logger=True)
+            pass
         elif self.task == "reg":
             self.log(f"{stage}_mse", mse, on_epoch=True, on_step=False, prog_bar=True, logger=True)
             self.log(f"{stage}_r2", r2, on_epoch=True, on_step=False, prog_bar=True, logger=True)
@@ -245,6 +256,12 @@ class WrapperModel(LightningModule):
         self.log(f"{stage}_pr", precision.nanmean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
         self.log(f"{stage}_re", recall.nanmean(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
         self.log(f"{stage}_f1", f1.nanmean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+
+        auc_per_class = torchAUROC(torch.concatenate(self.probabilities, dim=0), torch.concatenate(self.labels, dim=0), self.n_classes)
+        self.probabilities = []
+        self.labels = []
+
+        self.log(f"{stage}_pr", auc_per_class.nanmean(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
 
     def on_train_epoch_end(self):
         self.log_metrics("train")
