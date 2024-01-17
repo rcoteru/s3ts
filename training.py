@@ -13,11 +13,15 @@ def main(args):
     dm = load_dm(args)
 
     modelname = get_model_name(args)
+    modeldir = modelname.replace("|", "_").replace(",", "_")
     print("\n" + modelname)
     model = get_model(modelname, args, dm)
 
     # save computed patterns for later use
-    with open(os.path.join(args.training_dir, modelname.replace("|", "_").replace(",", "_"), "pattern.npz"), "wb") as f:
+    if not os.path.exists(os.path.join(args.training_dir, modeldir)):
+        os.mkdir(os.path.join(args.training_dir, modeldir))
+
+    with open(os.path.join(args.training_dir, modeldir, "pattern.npz"), "wb") as f:
         np.save(f, dm.dfds.patterns)
     
     print("\n" + "Start training:")
@@ -27,7 +31,7 @@ def main(args):
             "seed": 42
         })
     
-    with open(os.path.join(args.training_dir, modelname.replace("|", "_").replace(",", "_"), "results.dict"), "w") as f:
+    with open(os.path.join(args.training_dir, modeldir, "results.dict"), "w") as f:
         f.write(str({**data, **args.__dict__, "name": modelname}))
     
     print(data)
