@@ -2,7 +2,7 @@
 
 import os
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from s3ts.data.base import StreamingFramesDM
 from s3ts.api.encodings import compute_DM, compute_oDTW, compute_oDTW_channel
 import torchvision as tv
@@ -25,7 +25,6 @@ class DFDataset(Dataset):
             patterns: np.ndarray = None,
             rho: float = 0.1,
             dm_transform = None,
-            ram: bool = False,
             cached: bool = True,
             dataset_name: str = "") -> None:
         super().__init__()
@@ -35,7 +34,6 @@ class DFDataset(Dataset):
         '''
 
         self.stsds = stsds
-        self.ram = ram
         self.cached = cached
         self.cache_dir = None
 
@@ -51,18 +49,18 @@ class DFDataset(Dataset):
 
         self.DM = []
 
+        hash = hashlib.sha1(patterns.data)
+        self.cache_dir = os.path.join(os.getcwd(), f"cache_{dataset_name}_" + hash.hexdigest())
+
+        if not os.path.exists(self.cache_dir):
+            os.mkdir(self.cache_dir)
+        elif len(os.listdir(self.cache_dir)) == len(self.stsds.splits):
+            print("Loading cached dissimilarity frames if available...")
+
+        with open(os.path.join(self.cache_dir, "pattern.npz"), "wb") as f:
+            np.save(f, self.patterns)
+
         if cached:
-            hash = hashlib.sha1(patterns.data)
-            self.cache_dir = os.path.join(os.getcwd(), f"cache_{dataset_name}_" + hash.hexdigest())
-
-            if not os.path.exists(self.cache_dir):
-                os.mkdir(self.cache_dir)
-            elif len(os.listdir(self.cache_dir)) == len(self.stsds.splits):
-                print("Loading cached dissimilarity frames if available...")
-
-            with open(os.path.join(self.cache_dir, "pattern.npz"), "wb") as f:
-                np.save(f, self.patterns)
-
             for s in range(self.stsds.splits.shape[0] - 1):
                 save_path = os.path.join(self.cache_dir, f"part{s}.npz")
                 if not os.path.exists(save_path):
@@ -221,8 +219,19 @@ class LDFDataset(StreamingFramesDM):
         test_indices = np.arange(total_observations)[data_split["test"](self.dfds.stsds.indices)]
         val_indices = np.arange(total_observations)[data_split["val"](self.dfds.stsds.indices)]
 
+        self.train_labels = self.dfds.stsds.SCS[self.dfds.stsds.indices[train_indices]]
+        self.train_label_weights = np.empty_like(self.train_labels, dtype=np.float32)
+
+        self.reduce_train_imbalance = reduce_train_imbalance
         if reduce_train_imbalance:
-            train_indices = reduce_imbalance(train_indices, self.dfds.stsds.SCS[self.dfds.stsds.indices[train_indices]], seed=random_seed)
+            cl, counts = torch.unique(self.train_labels, return_counts=True)
+            for i in range(cl.shape[0]):
+                self.train_label_weights[self.train_labels == cl[i]] = self.train_labels.shape[0] / counts[i]
+
+            examples_per_epoch = int(counts.float().mean().ceil().item())
+            print(f"Sampling {examples_per_epoch} (balanced) observations per epoch.")
+            self.train_sampler = WeightedRandomSampler(self.train_label_weights, int(counts.float().mean().ceil().item()), replacement=True)
+            # train_indices = reduce_imbalance(train_indices, self.train_labels, seed=random_seed)
 
         self.ds_train = DFDatasetCopy(self.dfds, train_indices, label_mode)
         self.ds_test = DFDatasetCopy(self.dfds, test_indices, label_mode)
@@ -230,9 +239,14 @@ class LDFDataset(StreamingFramesDM):
         
     def train_dataloader(self) -> DataLoader:
         """ Returns the training DataLoader. """
-        return DataLoader(self.ds_train, batch_size=self.batch_size, 
-            num_workers=self.num_workers, shuffle=True,
-            pin_memory=True, persistent_workers=True)
+        if self.reduce_train_imbalance:
+            return DataLoader(self.ds_train, batch_size=self.batch_size, 
+                num_workers=self.num_workers, sampler=self.train_sampler,
+                pin_memory=True, persistent_workers=True)
+        else:
+            return DataLoader(self.ds_train, batch_size=self.batch_size, 
+                num_workers=self.num_workers, shuffle=True ,
+                pin_memory=True, persistent_workers=True)
 
     def val_dataloader(self) -> DataLoader:
         """ Returns the validation DataLoader. """

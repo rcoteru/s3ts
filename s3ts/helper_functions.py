@@ -74,6 +74,12 @@ def get_parser():
         help="Directory of model checkpoints")
     parser.add_argument("--n_val_subjects", default=1, type=int, 
         help="Number of subjects for validation")
+    parser.add_argument("--cached", action="store_true", 
+        help="If not set the DF are computed to RAM, patterns are saved regardless")
+    parser.add_argument("--weight_decayL1", default=0, type=float,
+        help="Parameter controlling L1 regularizer")
+    parser.add_argument("--weight_decayL2", default=0, type=float,
+        help="Parameter controlling L2 regularizer")
 
     return parser
 
@@ -129,7 +135,8 @@ def load_dmdataset(
         label_mode = 1,
         use_medoids = True,
         overlap = -1,
-        n_val_subjects = 1):
+        n_val_subjects = 1,
+        cached = True):
 
     actual_window_size = window_size
     if pattern_size > window_size:
@@ -166,7 +173,7 @@ def load_dmdataset(
     ds.wstride = window_stride # restore original wstride
 
     print("Computing dissimilarity frames...")
-    dfds = DFDataset(ds, patterns=meds, rho=rho, dm_transform=None, cached=True, ram=False, dataset_name=dataset_name)
+    dfds = DFDataset(ds, patterns=meds, rho=rho, dm_transform=None, cached=cached, dataset_name=dataset_name)
 
     data_split = split_by_test_subject(ds, subjects_for_test, n_val_subjects)
 
@@ -224,7 +231,8 @@ def load_dm(args):
             rho=args.rho, batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
             compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
-            label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids, overlap=args.overlap, n_val_subjects=args.n_val_subjects)
+            label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids, overlap=args.overlap, 
+            n_val_subjects=args.n_val_subjects, cached=args.cached)
     elif args.mode in ["ts", "dtw", "dtw_c", "mtf", "gasf", "gadf"]:
         dm = load_tsdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, 
@@ -242,7 +250,7 @@ def get_model(name, args, dm):
         dsrc=args.mode, arch=args.encoder_architecture, dec_arch=args.decoder_architecture,
         task="cls", lr=args.lr, enc_feats=args.encoder_features, 
         dec_feats=args.decoder_features, dec_layers=args.decoder_layers,
-        voting={"n": args.voting, "rho": args.rho}, args=str(args.__dict__))
+        voting={"n": args.voting, "rho": args.rho}, weight_decayL1=args.weight_decayL1, weight_decayL2=args.weight_decayL2, args=str(args.__dict__))
     
     return model
 

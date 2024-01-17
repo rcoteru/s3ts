@@ -38,7 +38,10 @@ baseArguments = {
     "rho": 0.1,
     "overlap": -1,
     "max_epochs": 10,
-    "training_dir": "training_cv2"
+    "training_dir": "training_cv2",
+    "cached": False,
+    "weight_decayL1": 0,
+    "weight_decayL2": 0
 }
 
 imgExperiments = {

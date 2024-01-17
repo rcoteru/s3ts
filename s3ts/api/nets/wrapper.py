@@ -63,7 +63,7 @@ class WrapperModel(LightningModule):
     def __init__(self, dsrc, arch, dec_arch, task,
         n_dims, n_classes, n_patterns, l_patterns,
         wdw_len, wdw_str, sts_str,
-        enc_feats, dec_feats, dec_layers, lr, voting,
+        enc_feats, dec_feats, dec_layers, lr, voting, weight_decayL1, weight_decayL2,
         name=None, args=None) -> None:
 
         """ Wrapper for the PyTorch models used in the experiments. """
@@ -223,7 +223,17 @@ class WrapperModel(LightningModule):
             self.log(f"{stage}_r2", r2, on_epoch=True, on_step=False, prog_bar=True, logger=True)
 
         # return loss
-        return loss.to(torch.float32)
+        l1_loss = torch.tensor(0., requires_grad=True)
+        l2_loss = torch.tensor(0., requires_grad=True)
+        if self.weight_decayL1 > 0:
+            l1_loss = self.weight_decayL1 * sum(p.abs().sum() for name, p in self.named_parameters() if ("bias" not in name and "bn" not in name))
+            self.log(f"{stage}_L1", l1_loss, on_epoch=True, on_step=True, prog_bar=True, logger=True)
+
+        if self.weight_decayL2 > 0:
+            l2_loss = self.weight_decayL2 * sum(p.square().sum() for name, p in self.named_parameters() if ("bias" not in name and "bn" not in name))
+            self.log(f"{stage}_L2", l2_loss, on_epoch=True, on_step=True, prog_bar=True, logger=True)
+
+        return loss.to(torch.float32) + l1_loss.to(torch.float32) + l2_loss.to(torch.float32)
 
     def training_step(self, batch: dict[str: torch.Tensor], batch_idx: int):
         """ Training step. """

@@ -12,6 +12,7 @@ def main(args):
     dm = load_dm(args)
 
     modelname = get_model_name(args)
+    print("\n" + modelname)
     model = get_model(modelname, args, dm)
     
     model, data = train_model(dm, model, max_epochs=args.max_epochs, pl_kwargs={
