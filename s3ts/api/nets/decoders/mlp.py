@@ -16,7 +16,6 @@ class MultiLayerPerceptron(LightningModule):
 
         self.hid_layers = hid_layers
         self.features = [inp_feats] + [hid_feats for i in range(hid_layers)] + [out_feats]
-        print(self.features)
 
         for hl in range(hid_layers):
             setattr(self, f"fcn_layer_{hl}", nn.Linear(in_features=self.features[hl], out_features=self.features[hl+1]))

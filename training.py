@@ -20,6 +20,7 @@ def main(args):
     with open(os.path.join(args.training_dir, modelname.replace("|", "_").replace(",", "_"), "pattern.npz"), "wb") as f:
         np.save(f, dm.dfds.patterns)
     
+    print("\n" + "Start training:")
     model, data = train_model(dm, model, max_epochs=args.max_epochs, pl_kwargs={
             "default_root_dir": args.training_dir,
             "accelerator": "auto",
