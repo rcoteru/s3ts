@@ -115,7 +115,7 @@ class DFDataset(Dataset):
         last = id - self.stsds.splits[s]
 
         if self.cached:
-            dm_np = np.load(os.path.join(self.cache_dir, f"part{s}.npz"))[first:last:self.stsds.wstride].copy()
+            dm_np = np.load(os.path.join(self.cache_dir, f"part{s}.npz"), mmap_mode="r")[first:last:self.stsds.wstride].copy()
         else:
             dm_np = self.DM[s][first:last:self.stsds.wstride].copy()
         dm = torch.permute(torch.from_numpy(dm_np), (1, 2, 0)) # recover the dimensions of dm (n_frames, patt_len, n)
