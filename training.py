@@ -6,7 +6,8 @@ from s3ts.api.nets.methods import train_model
 
 from s3ts.arguments import get_model_name
 
-from pytorch_lightning import Trainer, seed_everything
+from pytorch_lightning import seed_everything
+import numpy as np
 
 def main(args):
     dm = load_dm(args)
@@ -14,6 +15,10 @@ def main(args):
     modelname = get_model_name(args)
     print("\n" + modelname)
     model = get_model(modelname, args, dm)
+
+    # save computed patterns for later use
+    with open(os.path.join(args.training_dir, modelname.replace("|", "_").replace(",", "_"), "pattern.npz"), "wb") as f:
+        np.save(f, dm.dfds.patterns)
     
     model, data = train_model(dm, model, max_epochs=args.max_epochs, pl_kwargs={
             "default_root_dir": args.training_dir,
