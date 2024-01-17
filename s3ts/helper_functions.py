@@ -136,7 +136,8 @@ def load_dmdataset(
         use_medoids = True,
         overlap = -1,
         n_val_subjects = 1,
-        cached = True):
+        cached = True,
+        patterns = None):
 
     actual_window_size = window_size
     if pattern_size > window_size:
@@ -157,15 +158,18 @@ def load_dmdataset(
     #     meds = np.load(os.path.join(dataset_home_directory, dataset_name, f"meds{window_size}.npz"))
     #     assert meds.shape[2] == pattern_size
 
-    if use_medoids:
-        print("Computing medoids...")
-        meds = sts_medoids(ds, pattern_size=pattern_size, meds_per_class=num_medoids, n=compute_n)
+    if patterns is None:
+        if use_medoids:
+            print("Computing medoids...")
+            meds = sts_medoids(ds, pattern_size=pattern_size, meds_per_class=num_medoids, n=compute_n)
+        else:
+            print("Using synthetic shapes...")
+            meds = np.empty((3, pattern_size))
+            meds[0,:] = np.linspace(-1, 1, pattern_size)
+            meds[1,:] = np.linspace(1, -1, pattern_size)
+            meds[2,:] = 0
     else:
-        print("Using synthetic shapes...")
-        meds = np.empty((3, pattern_size))
-        meds[0,:] = np.linspace(-1, 1, pattern_size)
-        meds[1,:] = np.linspace(1, -1, pattern_size)
-        meds[2,:] = 0
+        meds=patterns
 
     if pattern_size > actual_window_size:
         ds.wsize = actual_window_size
@@ -224,7 +228,7 @@ def load_tsdataset(
 
     return dm
 
-def load_dm(args):
+def load_dm(args, patterns = None):
     if args.mode == "img":
         dm = load_dmdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, 
@@ -232,7 +236,7 @@ def load_dm(args):
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
             compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
             label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids, overlap=args.overlap, 
-            n_val_subjects=args.n_val_subjects, cached=args.cached)
+            n_val_subjects=args.n_val_subjects, cached=args.cached, patterns=patterns)
     elif args.mode in ["ts", "dtw", "dtw_c", "mtf", "gasf", "gadf"]:
         dm = load_tsdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, 

@@ -11,6 +11,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.utilities.model_summary import summarize
 
 import pandas as pd
+import numpy as np
 
 def main(args):
     hparam_path = os.path.join(args.model_dir, "hparams.yaml")
@@ -24,7 +25,9 @@ def main(args):
             return 1
     
     trainer = Trainer()
-    dm = load_dm(train_args)
+    patterns = np.load(os.path.join(os.path.dirname(args.model_dir), "pattern.npz"))
+
+    dm = load_dm(train_args, patterns=patterns)
 
     table = pd.DataFrame(columns=["name"])
 
