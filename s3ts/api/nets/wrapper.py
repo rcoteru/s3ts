@@ -223,17 +223,20 @@ class WrapperModel(LightningModule):
             self.log(f"{stage}_r2", r2, on_epoch=True, on_step=False, prog_bar=True, logger=True)
 
         # return loss
-        l1_loss = torch.tensor(0., requires_grad=True)
-        l2_loss = torch.tensor(0., requires_grad=True)
-        if self.weight_decayL1 > 0:
-            l1_loss = self.weight_decayL1 * sum(p.abs().sum() for name, p in self.named_parameters() if ("bias" not in name and "bn" not in name))
-            self.log(f"{stage}_L1", l1_loss, on_epoch=True, on_step=True, prog_bar=True, logger=True)
+        if stage == "train":
+            l1_loss = torch.tensor(0., requires_grad=True)
+            l2_loss = torch.tensor(0., requires_grad=True)
+            if self.weight_decayL1 > 0:
+                l1_loss = self.weight_decayL1 * sum(p.abs().sum() for name, p in self.named_parameters() if ("bias" not in name and "bn" not in name))
+                # self.log(f"{stage}_L1", l1_loss, on_epoch=True, on_step=True, prog_bar=True, logger=True)
 
-        if self.weight_decayL2 > 0:
-            l2_loss = self.weight_decayL2 * sum(p.square().sum() for name, p in self.named_parameters() if ("bias" not in name and "bn" not in name))
-            self.log(f"{stage}_L2", l2_loss, on_epoch=True, on_step=True, prog_bar=True, logger=True)
+            if self.weight_decayL2 > 0:
+                l2_loss = self.weight_decayL2 * sum(p.square().sum() for name, p in self.named_parameters() if ("bias" not in name and "bn" not in name))
+                # self.log(f"{stage}_L2", l2_loss, on_epoch=True, on_step=True, prog_bar=True, logger=True)
 
-        return loss.to(torch.float32) + l1_loss.to(torch.float32) + l2_loss.to(torch.float32)
+            return loss.to(torch.float32) + l1_loss.to(torch.float32) + l2_loss.to(torch.float32)
+
+        return loss.to(torch.float32)
 
     def training_step(self, batch: dict[str: torch.Tensor], batch_idx: int):
         """ Training step. """
