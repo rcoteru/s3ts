@@ -28,8 +28,15 @@ UCI_HAR_LABELS = {
     3: "WALKING_DOWNSTAIRS",
     4: "SITTING",
     5: "STANDING",
-    6: "LAYING",
+    6: "LAYING",          
+    7: "STAND_TO_SIT",
+    8: "SIT_TO_STAND",
+    9: "SIT_TO_LIE",
+    10: "LIE_TO_SIT",
+    11: "STAND_TO_LIE",
+    12: "LIE_TO_STAND",
 }
 
-ucihar_label_mapping = np.zeros(7)
-ucihar_label_mapping[1:] = np.arange(6)
+ucihar_label_mapping = np.zeros(13)
+ucihar_label_mapping[0] = 100
+ucihar_label_mapping[1:] = np.arange(12)

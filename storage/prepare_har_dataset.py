@@ -3,7 +3,7 @@ import numpy as np
 import os
 import datetime
 
-import os
+import re
 import wget
 
 import zipfile
@@ -12,7 +12,7 @@ import tarfile
 DATASETS = {
     "WARD": "https://people.eecs.berkeley.edu/~yang/software/WAR/WARD1.zip",
     "HASC": "http://bit.ly/i0ivEz",
-    "UCI-HAR": "https://archive.ics.uci.edu/static/public/240/human+activity+recognition+using+smartphones.zip",
+    "UCI-HAR": "https://archive.ics.uci.edu/static/public/341/smartphone+based+recognition+of+human+activities+and+postural+transitions.zip",
     "WISDM": "https://www.cis.fordham.edu/wisdm/includes/datasets/latest/WISDM_ar_latest.tar.gz", # tar.gz
     "USC-HAD": "https://sipi.usc.edu/had/USC-HAD.zip",
     "OPPORTUNITY": "https://archive.ics.uci.edu/static/public/226/opportunity+activity+recognition.zip",
@@ -178,64 +178,76 @@ def prepare_harth(dataset_dir):
             print(f"\t{counts[c]} observations ({(counts[c]/total):.2f})")
 
 
-def prepare_uci_har(dataset_dir, split = "both"):
-    # Dataset is already split into windows (128-point windows, or 2.56s at 20ms per observation), with 50% (64-points) overlap
-    # recover the STS, we assume no data points are missing
-
-    assert split in ["both", "train", "test"]
-
-    if split == "both":
-        prepare_uci_har(dataset_dir, split="train")
-        prepare_uci_har(dataset_dir, split="test")
-        return 0
-    
-    labels = np.loadtxt(os.path.join(dataset_dir, "UCI HAR Dataset", split, f"y_{split}.txt"))
-
+def prepare_uci_har(dataset_dir):
     # load data
-    files = os.listdir(os.path.join(dataset_dir, "UCI HAR Dataset", split, "Inertial Signals"))
+    files = os.listdir(os.path.join(dataset_dir, "RawData"))
     files.sort()
 
     data = {}
 
+    total_points = 0
     for file in files:
+        if file == "labels.txt":
+            data[file] = []
+            with open(os.path.join(dataset_dir, "RawData", file)) as f:
+                for line in f:
+                    data[file].append(list(map(lambda x: int(x), line.strip().split())))
+            data[file] = np.array(data[file])
+            continue
+
         data[file] = []
-        with open(os.path.join(dataset_dir, "UCI HAR Dataset", split, "Inertial Signals", file)) as f:
+        with open(os.path.join(dataset_dir, "RawData", file)) as f:
             for line in f:
                 data[file].append(list(map(lambda x: float(x), line.strip().split())))
         data[file] = np.array(data[file])
 
-    obs, ws = data[files[0]].shape
-    overlap = ws//2
-    total_points = (obs + 1) * overlap
+        obs = data[file].shape[0]
+        total_points += obs
 
-    files.sort()
-    # OPTIONAL remove total acceleration
-    files = files[:-3]
-
-    # recover STS and SCS
-    STS = np.empty((total_points, len(files)))
-    SCS = np.empty(total_points)
-
-    for j, file in enumerate(files):
-        for i in range(obs):
-            STS[i*overlap:(i+1)*overlap, j] = data[file][i,:overlap]
-            SCS[i*overlap:(i+1)*overlap] = labels[i]
-        STS[obs*overlap:, j] = data[file][obs - 1,overlap:]
-        SCS[obs*overlap:] = labels[obs - 1]
+    print(total_points)
 
     # split into subjects
-    subject = np.loadtxt(os.path.join(dataset_dir, "UCI HAR Dataset", split, f"subject_{split}.txt"))
-    splits = [0] + list(np.nonzero(np.diff(subject).reshape(-1))[0] + 1) + [subject.size+1]
+    if not os.path.exists(os.path.join(dataset_dir, "processed")):
+        os.mkdir(os.path.join(dataset_dir, "processed"))
 
-    save_path = os.path.join(dataset_dir, "UCI HAR Dataset", split)
+    user_splits = {}
 
-    for split in range(len(splits) - 1):
-        with open(os.path.join(save_path, f"subject_{int(subject[splits[split]])}_sensor.npy"), "wb") as f:
-            np.save(f, STS[splits[split]*overlap:(splits[split+1])*overlap])
+    for j, file in enumerate([f for f in files if "acc" in f]):
+        n_obs = data[file].shape[0]
+
+        print(data[file].shape)
+
+        re_result = re.match(r"acc_exp(\d+)_user(\d+).txt", file)
+
+        experiment_number = re_result.group(1)
+        user_id = re_result.group(2)
+
+        exp_n_int = int(experiment_number)
+        user_id_int = int(user_id)
+
+        if not os.path.exists(os.path.join(dataset_dir, "processed", f"subject{user_id}")):
+            os.mkdir(os.path.join(dataset_dir, "processed", f"subject{user_id}"))
+        
+        split_n = user_splits.get(user_id, 0)
+        sensor_dir = os.path.join(dataset_dir, "processed", f"subject{user_id}", f"sensor{split_n}.npy")
+        label_dir = os.path.join(dataset_dir, "processed", f"subject{user_id}", f"label{split_n}.npy")
+
+        experiment_labels = np.zeros(n_obs)
+
+        for row in data["labels.txt"]:
+            exp_id, u_id, label, start, end = row
+            if exp_id == exp_n_int and u_id == user_id_int:
+                experiment_labels[start:(end+1)] = label
+
+        print(np.unique(experiment_labels))
+        with open(sensor_dir, "wb") as f:
+            np.save(f, np.hstack((data[file], data[file.replace("acc", "gyro")])))
                     
-        with open(os.path.join(save_path, f"subject_{int(subject[splits[split]])}_class.npy"), "wb") as f:
-            np.save(f, SCS[splits[split]*overlap:(splits[split+1])*overlap])
-            
+        with open(label_dir, "wb") as f:
+            np.save(f, experiment_labels)
+
+        user_splits[user_id] = user_splits.get(user_id, 0) + 1
+
 
 def prepare_mhealth(dataset_dir):
     files = os.listdir(os.path.join(dataset_dir, "MHEALTHDATASET")) # contains .log files
@@ -371,22 +383,22 @@ def extract_and_save_sensor_data(directory, user, mode):
         np.save(f, data[[119]].to_numpy(dtype=np.int64))
 
 if __name__ == "__main__":
-    #download("UCI-HAR", "./datasets")
-    download("HARTH", "./datasets")
-    download("MHEALTH", "./datasets")
-    download("WISDM", "./datasets")
+    # download("UCI-HAR", "./datasets")
+    # download("HARTH", "./datasets")
+    # download("MHEALTH", "./datasets")
+    # download("WISDM", "./datasets")
     #download("REALDISP", "./datasets")
 
-    #unpack("UCI-HAR", "./datasets")
-    unpack("HARTH", "./datasets")
-    unpack("MHEALTH", "./datasets")
-    unpack("WISDM", "./datasets")
+    # unpack("UCI-HAR", "./datasets")
+    # unpack("HARTH", "./datasets")
+    # unpack("MHEALTH", "./datasets")
+    # unpack("WISDM", "./datasets")
     #unpack("REALDISP", "./datasets")
 
-    #prepare_uci_har("./datasets/UCI-HAR")
-    prepare_harth("./datasets/HARTH")
-    prepare_mhealth("./datasets/MHEALTH")
-    prepare_wisdm("./datasets/WISDM")
+    prepare_uci_har("./datasets/UCI-HAR")
+    # prepare_harth("./datasets/HARTH")
+    # prepare_mhealth("./datasets/MHEALTH")
+    # prepare_wisdm("./datasets/WISDM")
     #prepare_realdisp("./datasets/REALDISP")
 
     pass

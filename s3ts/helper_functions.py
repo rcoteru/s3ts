@@ -95,7 +95,7 @@ def load_dataset(dataset_name, dataset_home_directory, window_size, window_strid
             wsize=window_size, wstride=window_stride, normalize=normalize)
     elif dataset_name == "UCI-HAR":
         ds = UCI_HARDataset(
-            os.path.join(dataset_home_directory, dataset_name), split="both", 
+            os.path.join(dataset_home_directory, dataset_name),
             wsize=window_size, wstride=window_stride, normalize=normalize, label_mapping=ucihar_label_mapping)
     elif dataset_name == "REALDISP":
         ds = REALDISPDataset(
