@@ -18,6 +18,8 @@ def main(args):
     model = get_model(modelname, args, dm)
 
     # save computed patterns for later use
+    if not os.path.exists(os.path.join(args.training_dir)):
+        os.mkdir(os.path.join(args.training_dir))    
     if not os.path.exists(os.path.join(args.training_dir, modeldir)):
         os.mkdir(os.path.join(args.training_dir, modeldir))
 
