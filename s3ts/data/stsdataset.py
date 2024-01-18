@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from pytorch_lightning import LightningDataModule
 
 from s3ts.data.base import STSDataset
@@ -145,8 +145,19 @@ class LSTSDataset(LightningDataModule):
         test_indices = np.arange(total_observations)[data_split["test"](self.stsds.indices)][::skip]
         val_indices = np.arange(total_observations)[data_split["val"](self.stsds.indices)][::skip]
 
+        self.train_labels = self.stsds.SCS[self.stsds.indices[train_indices]]
+        self.train_label_weights = np.empty_like(self.train_labels, dtype=np.float32)
+
+        self.reduce_train_imbalance = reduce_train_imbalance
         if reduce_train_imbalance:
-            train_indices = reduce_imbalance(train_indices, self.stsds.SCS[self.stsds.indices[train_indices]], seed=random_seed)
+            cl, counts = torch.unique(self.train_labels, return_counts=True)
+            for i in range(cl.shape[0]):
+                self.train_label_weights[self.train_labels == cl[i]] = self.train_labels.shape[0] / counts[i]
+
+            examples_per_epoch = int(counts.float().mean().ceil().item())
+            print(f"Sampling {examples_per_epoch} (balanced) observations per epoch.")
+            self.train_sampler = WeightedRandomSampler(self.train_label_weights, int(counts.float().mean().ceil().item()), replacement=True)
+            # train_indices = reduce_imbalance(train_indices, self.train_labels, seed=random_seed)
 
         self.ds_train = StreamingTimeSeriesCopy(self.stsds, train_indices, label_mode, mode, mtf_bins)
         self.ds_test = StreamingTimeSeriesCopy(self.stsds, test_indices, label_mode, mode, mtf_bins)
@@ -154,9 +165,14 @@ class LSTSDataset(LightningDataModule):
         
     def train_dataloader(self) -> DataLoader:
         """ Returns the training DataLoader. """
-        return DataLoader(self.ds_train, batch_size=self.batch_size, 
-            num_workers=self.num_workers, shuffle=True,
-            pin_memory=True, persistent_workers=True)
+        if self.reduce_train_imbalance:
+            return DataLoader(self.ds_train, batch_size=self.batch_size, 
+                num_workers=self.num_workers, sampler=self.train_sampler,
+                pin_memory=True, persistent_workers=True)
+        else:
+            return DataLoader(self.ds_train, batch_size=self.batch_size, 
+                num_workers=self.num_workers, shuffle=True ,
+                pin_memory=True, persistent_workers=True)
 
     def val_dataloader(self) -> DataLoader:
         """ Returns the validation DataLoader. """

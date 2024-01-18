@@ -23,8 +23,9 @@ def main(args):
     if not os.path.exists(os.path.join(args.training_dir, modeldir)):
         os.mkdir(os.path.join(args.training_dir, modeldir))
 
-    with open(os.path.join(args.training_dir, modeldir, "pattern.npz"), "wb") as f:
-        np.save(f, dm.dfds.patterns)
+    if hasattr(dm, "dfds"):
+        with open(os.path.join(args.training_dir, modeldir, "pattern.npz"), "wb") as f:
+            np.save(f, dm.dfds.patterns)
     
     print("\n" + "Start training:")
     model, data = train_model(dm, model, max_epochs=args.max_epochs, pl_kwargs={

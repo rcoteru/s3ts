@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from collections import OrderedDict
+
 class CNN_GAP_TS(torch.nn.Module):
     
     def __init__(self, channels=1, ref_size=32, 
@@ -13,26 +15,32 @@ class CNN_GAP_TS(torch.nn.Module):
         self.n_feature_maps = n_feature_maps
 
         # convolutional layer 0
-        self.cnn_0 = nn.Sequential(nn.Conv1d(in_channels=channels, 
-            out_channels=self.n_feature_maps, kernel_size=5, padding='same'),
-            nn.BatchNorm1d(num_features=self.n_feature_maps),
-            nn.ReLU(), nn.MaxPool1d(kernel_size=2))
+        self.cnn_0 = nn.Sequential(OrderedDict([
+            ("conv", nn.Conv1d(in_channels=channels, out_channels=self.n_feature_maps, kernel_size=5, padding='same')),
+            ("bn", nn.BatchNorm1d(num_features=self.n_feature_maps)),
+            ("activation", nn.ReLU()), 
+            ("pool", nn.MaxPool1d(kernel_size=2))
+            ]))
         
         # convolutional layer 1
-        self.cnn_1 = nn.Sequential(nn.Conv1d(in_channels=self.n_feature_maps, 
-            out_channels=self.n_feature_maps, kernel_size=4, padding='same'),
-            nn.BatchNorm1d(num_features=self.n_feature_maps),
-            nn.ReLU(), nn.MaxPool1d(kernel_size=2))
+        self.cnn_1 = nn.Sequential(OrderedDict([
+            ("conv", nn.Conv1d(in_channels=self.n_feature_maps, out_channels=self.n_feature_maps, kernel_size=4, padding='same')),
+            ("bn", nn.BatchNorm1d(num_features=self.n_feature_maps)),
+            ("activation", nn.ReLU()), 
+            ("pool", nn.MaxPool1d(kernel_size=2))
+            ]))
         
         # convolutional layer 2
-        self.cnn_2 = nn.Sequential(nn.Conv1d(in_channels=self.n_feature_maps, 
-            out_channels=self.n_feature_maps*2, kernel_size=3, padding='valid'),
-            nn.BatchNorm1d(num_features=self.n_feature_maps*2),
-            nn.ReLU())
+        self.cnn_2 = nn.Sequential(OrderedDict([
+            ("conv", nn.Conv1d(in_channels=self.n_feature_maps, out_channels=self.n_feature_maps*2, kernel_size=3, padding='valid')),
+            ("bn", nn.BatchNorm1d(num_features=self.n_feature_maps*2)),
+            ("activation", nn.ReLU())
+            ]))
         
-        self.last = nn.Sequential(nn.Conv1d(in_channels=self.n_feature_maps*2,
-            out_channels=self.n_feature_maps*4, kernel_size=1, padding="same"),
-            nn.ReLU())
+        self.last = nn.Sequential(OrderedDict([
+            ("conv", nn.Conv1d(in_channels=self.n_feature_maps*2, out_channels=self.n_feature_maps*4, kernel_size=1, padding="same")),
+            ("activation", nn.ReLU())
+            ]))
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.cnn_0(x)
