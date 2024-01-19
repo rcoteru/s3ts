@@ -106,3 +106,42 @@ def split_by_test_subject(sts, test_subject, n_val_subjects, seed=42):
         "val": lambda x: return_indices_test(x, subjects=val_subjects_selected, subject_splits=subject_splits),
         "test": lambda x: return_indices_test(x, subjects=test_subject, subject_splits=subject_splits),
     }
+
+def process_fft(STS, SCS, sampling, window_size):
+    class_changes = [0] + list(np.nonzero(np.diff(SCS))[0])
+
+    top10 = {} # a dict for each class
+    classes = np.unique(SCS)
+    for c in classes:
+        top10[c] = [{} for i in range(STS.shape[0])] # a dict for each channel
+
+    for i in range(len(class_changes)-1):
+        current_class = SCS[class_changes[i]+1].item()
+
+        series_part = STS[:, (class_changes[i]+1):(class_changes[i+1]+1)]
+        fft_size = 2**int(np.log2(series_part.shape[1]))
+        fft_short = np.fft.fft(series_part, axis=-1, n=fft_size)
+        fft_freq = np.fft.fftfreq(fft_size, d=1/sampling) # highest frequencies for signals of sampling rate 50 is 25
+
+        fft_short_sort = np.argsort(np.abs(fft_short), axis=-1) # sort is ascending magnitudes
+
+        fft_freq_sort = np.abs(fft_freq[fft_short_sort][:,-5:]) # get the 10 for each channel frequencies (+-) with highest amplitude
+
+        for c in range(fft_freq_sort.shape[0]):
+            for j in range(fft_freq_sort.shape[1]):
+                top10[current_class][c][fft_freq_sort[c, j]] = top10[current_class][c].get(fft_freq_sort[c, j], 0) + 1
+
+    return top10
+
+def get_predominant_frequency(fft_process_result):
+    classes_list = list(filter(lambda x: x!=100, fft_process_result.keys()))
+    num_classes = len(classes_list)
+
+    out = np.zeros((num_classes, len(fft_process_result[0]))) # (n, c) we get a predominant frequency per channel, per class
+
+    for i, c in enumerate(classes_list):
+        for j, channel_result in enumerate(fft_process_result[c]):
+            sorted_fr = list(filter(lambda x: x[0]>0, sorted(channel_result.items(), key=lambda x:x[1])))
+            out[i, j] = sorted_fr[-1][0]
+    
+    return out
