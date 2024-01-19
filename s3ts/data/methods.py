@@ -107,7 +107,7 @@ def split_by_test_subject(sts, test_subject, n_val_subjects, seed=42):
         "test": lambda x: return_indices_test(x, subjects=test_subject, subject_splits=subject_splits),
     }
 
-def process_fft(STS, SCS, sampling, window_size):
+def process_fft(STS, SCS):
     class_changes = [0] + list(np.nonzero(np.diff(SCS))[0])
 
     top10 = {} # a dict for each class
@@ -121,7 +121,7 @@ def process_fft(STS, SCS, sampling, window_size):
         series_part = STS[:, (class_changes[i]+1):(class_changes[i+1]+1)]
         fft_size = 2**int(np.log2(series_part.shape[1]))
         fft_short = np.fft.fft(series_part, axis=-1, n=fft_size)
-        fft_freq = np.fft.fftfreq(fft_size, d=1/sampling) # highest frequencies for signals of sampling rate 50 is 25
+        fft_freq = np.fft.fftfreq(fft_size) # highest frequencies for signals of sampling rate 50 is 25
 
         fft_short_sort = np.argsort(np.abs(fft_short), axis=-1) # sort is ascending magnitudes
 

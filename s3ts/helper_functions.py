@@ -172,6 +172,15 @@ def load_dmdataset(
             meds[0,:] = np.linspace(-1, 1, pattern_size) + 0.2 * np.random.randn(pattern_size) # sigma = 0.2*0.2 = 0.04 (std)
             meds[1,:] = np.linspace(1, -1, pattern_size) + 0.2 * np.random.randn(pattern_size)
             meds[2,:] = 0.1 * np.random.randn(pattern_size)
+        elif pattern_type == "freq":
+            print("Using sinusoidal with predominant frequencies")
+            res = process_fft(ds.STS, ds.SCS)
+            pred_freq = get_predominant_frequency(res)
+            meds = np.empty((pred_freq.shape[0], pred_freq.shape[1], pattern_size))
+            for i in range(pred_freq.shape[0]):
+                for j in range(pred_freq.shape[1]):
+                    meds[i, j, :] = np.sin(2*np.pi* pred_freq[i, j] *np.arange(pattern_size))
+
     else:
         meds=patterns
 
