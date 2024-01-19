@@ -11,7 +11,7 @@ def get_model_name(args):
     if args.mode in ["img", "dtw", "dtw_c"]:
         modelname += f"p{args.pattern_size},r{args.rho}|"
     if args.mode == "img":
-        modelname += f"med{args.num_medoids},{args.compute_n}|" if args.use_medoids else f"syn{args.compute_n}|"
+        modelname += f"med{args.num_medoids},{args.compute_n}|" if args.pattern_type == "med" else f"{args.pattern_type}{args.compute_n}|"
     if args.mode == "mtf":
         modelname += f"bin{args.mtf_bins}|"
 
@@ -31,7 +31,8 @@ def get_command(args):
         command += f"--pattern_size {args.pattern_size} --rho {args.rho} "
     if args.mode == "img":
         command += f"--compute_n {args.compute_n} "
-        command += f"--use_medoids --num_medoids {args.num_medoids} " if args.use_medoids else f"--use_synthetic "
+        command += f"--pattern_type {args.pattern_type} "
+        command += f"--num_medoids {args.num_medoids} " if args.pattern_type == "med" else ""
     if args.mode == "mtf":
         command += f"--mtf_bins {args.mtf_bins} "
 

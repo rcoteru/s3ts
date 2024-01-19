@@ -62,10 +62,8 @@ def get_parser():
         help="Number of previous predictions to consider in the vote of the next prediction, defaults to 1 (no voting)")
     parser.add_argument("--rho", default=0.1, type=float,
         help="Parameter of the online-dtw algorithm, the window_size-th root is used as the voting parameter")
-    parser.add_argument("--use_medoids", action="store_true", default=True,
-        help="Use medoids for DM computation")
-    parser.add_argument("--use_synthetic", action="store_false", dest="use_medoids", 
-        help="Use synthetic shapes for DM computation")
+    parser.add_argument("--pattern_type", type=str, default="med",
+        help="Type of pattern to use during DM computation") # pattern types: "med"
     parser.add_argument("--overlap", default=-1, type=int, 
         help="Overlap of observations between training and test examples, default -1 for maximum overlap (equivalent to overlap set to window size -1)")
     parser.add_argument("--mtf_bins", default=10, type=int, 
@@ -133,7 +131,7 @@ def load_dmdataset(
         reduce_train_imbalance = False,
         num_medoids = 1,
         label_mode = 1,
-        use_medoids = True,
+        pattern_type = "med",
         overlap = -1,
         n_val_subjects = 1,
         cached = True,
@@ -159,15 +157,21 @@ def load_dmdataset(
     #     assert meds.shape[2] == pattern_size
 
     if patterns is None:
-        if use_medoids:
+        if pattern_type == "med":
             print("Computing medoids...")
             meds = sts_medoids(ds, pattern_size=pattern_size, meds_per_class=num_medoids, n=compute_n)
-        else:
+        elif pattern_type == "syn":
             print("Using synthetic shapes...")
             meds = np.empty((3, pattern_size))
             meds[0,:] = np.linspace(-1, 1, pattern_size)
             meds[1,:] = np.linspace(1, -1, pattern_size)
             meds[2,:] = 0
+        elif pattern_type == "syn_g":
+            print("Using synthetic shapes with gaussian noise...")
+            meds = np.empty((3, pattern_size))
+            meds[0,:] = np.linspace(-1, 1, pattern_size) + 0.2 * np.random.randn(pattern_size) # sigma = 0.2*0.2 = 0.04 (std)
+            meds[1,:] = np.linspace(1, -1, pattern_size) + 0.2 * np.random.randn(pattern_size)
+            meds[2,:] = 0.1 * np.random.randn(pattern_size)
     else:
         meds=patterns
 
@@ -235,7 +239,7 @@ def load_dm(args, patterns = None):
             rho=args.rho, batch_size=args.batch_size, num_workers=args.num_workers, 
             window_size=args.window_size, window_stride=args.window_stride, normalize=args.normalize, pattern_size=args.pattern_size, 
             compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
-            label_mode=args.label_mode, num_medoids=args.num_medoids, use_medoids=args.use_medoids, overlap=args.overlap, 
+            label_mode=args.label_mode, num_medoids=args.num_medoids, pattern_type=args.pattern_type, overlap=args.overlap, 
             n_val_subjects=args.n_val_subjects, cached=args.cached, patterns=patterns)
     elif args.mode in ["ts", "dtw", "dtw_c", "mtf", "gasf", "gadf"]:
         dm = load_tsdataset(
