@@ -67,8 +67,8 @@ class STSDataset(Dataset):
     
     def __getitem__(self, index: int) -> tuple[np.ndarray, np.ndarray]:
 
-        first = self.indices[index]-self.wsize*self.wstride
-        last = self.indices[index]
+        first = self.indices[index]-self.wsize*self.wstride+1
+        last = self.indices[index]+1
 
         return self.STS[:, first:last:self.wstride], self.SCS[first:last:self.wstride]
     

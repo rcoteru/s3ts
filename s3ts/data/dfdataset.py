@@ -111,8 +111,8 @@ class DFDataset(Dataset):
 
         # identify the split of the index
         s = self.id_to_split[index]
-        first = id - self.stsds.wsize*self.stsds.wstride - self.stsds.splits[s]
-        last = id - self.stsds.splits[s]
+        first = id - self.stsds.wsize*self.stsds.wstride - self.stsds.splits[s] + 1
+        last = id - self.stsds.splits[s] + 1
 
         if self.cached:
             dm_np = np.load(os.path.join(self.cache_dir, f"part{s}.npz"), mmap_mode="r")[first:last:self.stsds.wstride].copy()

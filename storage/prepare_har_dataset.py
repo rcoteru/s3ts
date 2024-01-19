@@ -188,18 +188,10 @@ def prepare_uci_har(dataset_dir):
     total_points = 0
     for file in files:
         if file == "labels.txt":
-            data[file] = []
-            with open(os.path.join(dataset_dir, "RawData", file)) as f:
-                for line in f:
-                    data[file].append(list(map(lambda x: int(x), line.strip().split())))
-            data[file] = np.array(data[file])
+            data[file] = pandas.read_csv(os.path.join(dataset_dir, "RawData", file), sep=" ", header=None).to_numpy().astype(np.int64)
             continue
 
-        data[file] = []
-        with open(os.path.join(dataset_dir, "RawData", file)) as f:
-            for line in f:
-                data[file].append(list(map(lambda x: float(x), line.strip().split())))
-        data[file] = np.array(data[file])
+        data[file] = pandas.read_csv(os.path.join(dataset_dir, "RawData", file), sep=" ", header=None).to_numpy()
 
         obs = data[file].shape[0]
         total_points += obs
@@ -214,8 +206,6 @@ def prepare_uci_har(dataset_dir):
 
     for j, file in enumerate([f for f in files if "acc" in f]):
         n_obs = data[file].shape[0]
-
-        print(data[file].shape)
 
         re_result = re.match(r"acc_exp(\d+)_user(\d+).txt", file)
 
@@ -239,7 +229,6 @@ def prepare_uci_har(dataset_dir):
             if exp_id == exp_n_int and u_id == user_id_int:
                 experiment_labels[start:(end+1)] = label
 
-        print(np.unique(experiment_labels))
         with open(sensor_dir, "wb") as f:
             np.save(f, np.hstack((data[file], data[file.replace("acc", "gyro")])))
                     
@@ -383,19 +372,19 @@ def extract_and_save_sensor_data(directory, user, mode):
         np.save(f, data[[119]].to_numpy(dtype=np.int64))
 
 if __name__ == "__main__":
-    # download("UCI-HAR", "./datasets")
+    download("UCI-HAR", "./datasets")
     # download("HARTH", "./datasets")
     # download("MHEALTH", "./datasets")
     # download("WISDM", "./datasets")
     #download("REALDISP", "./datasets")
 
-    # unpack("UCI-HAR", "./datasets")
+    unpack("UCI-HAR", "./datasets")
     # unpack("HARTH", "./datasets")
     # unpack("MHEALTH", "./datasets")
     # unpack("WISDM", "./datasets")
     #unpack("REALDISP", "./datasets")
 
-    prepare_uci_har("./datasets/UCI-HAR")
+    prepare_uci_har("./datasets/UCI-HAR") # unneccesary
     # prepare_harth("./datasets/HARTH")
     # prepare_mhealth("./datasets/MHEALTH")
     # prepare_wisdm("./datasets/WISDM")
