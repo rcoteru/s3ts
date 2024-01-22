@@ -40,8 +40,8 @@ baseArguments = {
     "max_epochs": 10,
     "training_dir": "training_tests",
     "cached": False,
-    "weight_decayL1": 0,
-    "weight_decayL2": 0
+    "weight_decayL1": 0.001,
+    "weight_decayL2": 0.0001
 }
 
 imgExperiments = {
@@ -50,7 +50,7 @@ imgExperiments = {
     "mode": "img",
     "num_medoids": 1,
     "compute_n": 300,
-    "pattern_type": "syn_g",
+    "pattern_type": ["med", "syn", "syn_g", "freq"],
     "pattern_size": 32
 }
 
