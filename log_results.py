@@ -32,7 +32,7 @@ def main(args):
     entries.sort()
 
     MODEL_NAME_LINE = 85
-    print(f"{'MODELNAME':>80}", end=" |")
+    print(f"{'MODELNAME':>100}", end=" |")
     for entry in entries:
         print(f"{entry:>10}", end="")
     print("\n" + "-"*110)
@@ -52,7 +52,7 @@ def main(args):
         
         for i, part in enumerate(name_parts):
             e = " |" if i==(len(name_parts)-1) else " |\n"
-            print(f"{part:>80}", end=e)
+            print(f"{part:>100}", end=e)
 
         for entry in entries:
             print(f"{loaded[model_name][entry]:>10.5f}", end="")

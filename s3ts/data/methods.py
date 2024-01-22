@@ -110,10 +110,10 @@ def split_by_test_subject(sts, test_subject, n_val_subjects, seed=42):
 def process_fft(STS, SCS):
     class_changes = [0] + list(np.nonzero(np.diff(SCS))[0])
 
-    top10 = {} # a dict for each class
+    magnitudes = {} # a dict for each class
     classes = np.unique(SCS)
     for c in classes:
-        top10[c] = [{} for i in range(STS.shape[0])] # a dict for each channel
+        magnitudes[c] = [{} for i in range(STS.shape[0])] # a dict for each channel
 
     for i in range(len(class_changes)-1):
         current_class = SCS[class_changes[i]+1].item()
@@ -123,25 +123,34 @@ def process_fft(STS, SCS):
         fft_short = np.fft.fft(series_part, axis=-1, n=fft_size)
         fft_freq = np.fft.fftfreq(fft_size) # highest frequencies for signals of sampling rate 50 is 25
 
-        fft_short_sort = np.argsort(np.abs(fft_short), axis=-1) # sort is ascending magnitudes
+        for c in range(fft_short.shape[0]):
+            for j in range(fft_short.shape[1]):
+                magnitudes[current_class][c][fft_freq[j]] = magnitudes[current_class][c].get(fft_freq[j], 0) + np.abs(fft_short[c, j])
 
-        fft_freq_sort = np.abs(fft_freq[fft_short_sort][:,-5:]) # get the 10 for each channel frequencies (+-) with highest amplitude
+    return magnitudes
 
-        for c in range(fft_freq_sort.shape[0]):
-            for j in range(fft_freq_sort.shape[1]):
-                top10[current_class][c][fft_freq_sort[c, j]] = top10[current_class][c].get(fft_freq_sort[c, j], 0) + 1
-
-    return top10
-
-def get_predominant_frequency(fft_process_result):
-    classes_list = list(filter(lambda x: x!=100, fft_process_result.keys()))
+def get_predominant_frequency(fft_mag, mode="count"):
+    classes_list = list(filter(lambda x: x!=100, fft_mag.keys()))
     num_classes = len(classes_list)
 
-    out = np.zeros((num_classes, len(fft_process_result[0]))) # (n, c) we get a predominant frequency per channel, per class
+    if mode=="count":
+        out = np.zeros((num_classes, len(fft_mag[0]))) # (n, c) we get a predominant frequency per channel, per class
 
-    for i, c in enumerate(classes_list):
-        for j, channel_result in enumerate(fft_process_result[c]):
-            sorted_fr = list(filter(lambda x: x[0]>0, sorted(channel_result.items(), key=lambda x:x[1])))
-            out[i, j] = sorted_fr[-1][0]
+        for i, c in enumerate(classes_list):
+            for j, channel_result in enumerate(fft_mag[c]):
+                sorted_fr = list(filter(lambda x: x[0]>0, sorted(channel_result.items(), key=lambda x:x[1])))
+                out[i, j] = sorted_fr[-1][0]
+        
+        return out
     
-    return out
+    elif mode=="magnitude": # get the frequencies with most importance in the fft transform
+        out = {} # frequencies magnitude total
+
+        for i, c in enumerate(classes_list):
+            for j, channel_result in enumerate(fft_mag[c]):
+                for f in channel_result.keys():
+                     out[f] = out.get(f, 0) + channel_result[f]                
+        
+        frequencies_ordered = np.array(list(filter(lambda x: x[0]>0, sorted(out.items(), key=lambda x:x[1], reverse=True))))
+
+        return frequencies_ordered
