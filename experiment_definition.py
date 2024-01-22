@@ -3,27 +3,27 @@ baseArguments = {
     "dataset": "HARTH",
     "subjects_for_test": [
         [21],
-	# [20],
-	# [19],
-	# [18],
-	# [17],
-	# [16],
-	# [15],
-	# [14],
-	# [13],
-	# [12],
-	# [11],
-	# [10],
-	# [9],
-	# [8],
-	# [7],
-	# [6],
-	# [5],
-	# [4],
-	# [3],
-	# [2],
-	# [1],
-	# [0]
+        [20],
+        [19],
+        [18],
+        [17],
+        [16],
+        [15],
+        [14],
+        [13],
+        [12],
+        [11],
+        [10],
+        [9],
+        [8],
+        [7],
+        [6],
+        [5],
+        [4],
+        [3],
+        [2],
+        [1],
+        [0]
     ],
     "lr": 0.001,
     "n_val_subjects": 4,
@@ -38,20 +38,20 @@ baseArguments = {
     "rho": 0.1,
     "overlap": -1,
     "max_epochs": 10,
-    "training_dir": "training_tests",
+    "training_dir": "training_cv_new_patterns",
     "cached": False,
-    "weight_decayL1": 0.001,
-    "weight_decayL2": 0.0001
+    "weight_decayL1": 0.0001,
+    "weight_decayL2": 0.0
 }
 
 imgExperiments = {
-    "window_size": 25,
-    "window_stride": 3,
+    "window_size": 32,
+    "window_stride": 2,
     "mode": "img",
     "num_medoids": 1,
     "compute_n": 300,
-    "pattern_type": ["med", "syn", "syn_g", "freq"],
-    "pattern_size": 32
+    "pattern_type": ["syn_g", "freq", "freq_c"],
+    "pattern_size": 24
 }
 
 dtwExperiments = {
