@@ -129,11 +129,11 @@ def process_fft(STS, SCS):
 
     return magnitudes
 
-def get_predominant_frequency(fft_mag, mode="count"):
+def get_predominant_frequency(fft_mag, mode="per_class"):
     classes_list = list(filter(lambda x: x!=100, fft_mag.keys()))
     num_classes = len(classes_list)
 
-    if mode=="count":
+    if mode=="per_class":
         out = np.zeros((num_classes, len(fft_mag[0]))) # (n, c) we get a predominant frequency per channel, per class
 
         for i, c in enumerate(classes_list):
@@ -143,7 +143,7 @@ def get_predominant_frequency(fft_mag, mode="count"):
         
         return out
     
-    elif mode=="magnitude": # get the frequencies with most importance in the fft transform
+    elif mode=="per_channel": # get the frequencies with most importance in the fft transform
         out = {} # frequencies magnitude total
 
         for i, c in enumerate(classes_list):

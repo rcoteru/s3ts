@@ -175,7 +175,7 @@ def load_dmdataset(
         elif pattern_type == "freq":
             print("Using sinusoidal with predominant frequencies...")
             fft_mag = process_fft(ds.STS, ds.SCS)
-            pred_freq = get_predominant_frequency(fft_mag, mode="count")
+            pred_freq = get_predominant_frequency(fft_mag, mode="per_class")
             meds = np.empty((pred_freq.shape[0], pred_freq.shape[1], pattern_size))
             for i in range(pred_freq.shape[0]):
                 for j in range(pred_freq.shape[1]):
@@ -183,7 +183,7 @@ def load_dmdataset(
         elif pattern_type == "freq_c":
             print("Using sinusoidal with predominant frequencies per channel...")
             fft_mag = process_fft(ds.STS, ds.SCS)
-            pred_freq = get_predominant_frequency(fft_mag, mode="magnitude") # shape (freqs, 2) i,e, value, magnitude
+            pred_freq = get_predominant_frequency(fft_mag, mode="per_channel") # shape (freqs, 2) i,e, value, magnitude
             NUM_WAVES = 3
             meds = np.empty((NUM_WAVES, pattern_size))
             for i in range(NUM_WAVES):
