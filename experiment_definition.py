@@ -38,7 +38,7 @@ baseArguments = {
     "rho": 0.1,
     "overlap": -1,
     "max_epochs": 10,
-    "training_dir": "training_syn_2",
+    "training_dir": "training_syn_1",
     "cached": False,
     "weight_decayL1": 0.0001,
     "weight_decayL2": 0.0
@@ -50,7 +50,7 @@ imgExperiments = {
     "mode": "img",
     "num_medoids": 1,
     "compute_n": 300,
-    "pattern_type": "syn_2",
+    "pattern_type": "syn_1",
     "pattern_size": 24
 }
 

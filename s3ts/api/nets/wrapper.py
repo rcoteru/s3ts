@@ -264,10 +264,12 @@ class WrapperModel(LightningModule):
         precision = TP/(TP+FP)
         recall = TP/(TP+FN) # this is the same as accuracy per class
         f1 = 2*(precision*recall)/(precision + recall)
+        iou = TP/(TP+FP+FN) # iou per class
 
         self.log(f"{stage}_pr", precision.nanmean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
         self.log(f"{stage}_re", recall.nanmean(), on_epoch=True, on_step=False, prog_bar=True, logger=True)
         self.log(f"{stage}_f1", f1.nanmean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
+        self.log(f"{stage}_iou", iou.nanmean(), on_epoch=True, on_step=False, prog_bar=False, logger=True)
 
         if stage != "train":
             auc_per_class = tm.functional.auroc(
