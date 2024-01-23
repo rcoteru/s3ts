@@ -166,6 +166,11 @@ def load_dmdataset(
             meds[0,:] = np.linspace(-1, 1, pattern_size)
             meds[1,:] = np.linspace(1, -1, pattern_size)
             meds[2,:] = 0
+        elif pattern_type == "syn_2":
+            print("Using up down shape...")
+            meds = np.empty((2, pattern_size))
+            meds[0,:] = np.linspace(-1, 1, pattern_size)
+            meds[1,:] = np.linspace(1, -1, pattern_size)
         elif pattern_type == "syn_g":
             print("Using synthetic shapes with gaussian noise...")
             meds = np.empty((3, pattern_size))
