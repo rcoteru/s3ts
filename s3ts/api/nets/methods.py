@@ -109,7 +109,7 @@ def train_model(
     tr.fit(model=model, datamodule=dm)
 
     # load the best weights
-    model = model.load_from_checkpoint(ckpt.best_model_path)
+    model = WrapperModel.load_from_checkpoint(ckpt.best_model_path)
 
     # run the validation with the final weights
     data = tr.test(model, datamodule=dm)
