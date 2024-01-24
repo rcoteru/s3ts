@@ -197,6 +197,32 @@ def load_dmdataset(
             meds = np.empty((NUM_WAVES, pattern_size))
             for i in range(NUM_WAVES):
                 meds[i, :] = np.sin(2*np.pi* pred_freq[i, 0] *np.arange(pattern_size))
+        elif pattern_type == "f1":
+            meds = np.empty((1, pattern_size))
+            meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 1/pattern_size) # one cycle
+        elif pattern_type == "f2":
+            meds = np.empty((1, pattern_size))
+            meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 2/pattern_size) # two cycle
+        elif pattern_type == "f4":
+            meds = np.empty((1, pattern_size))
+            meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 4/pattern_size) # four cycle
+        elif pattern_type == "f12":
+            meds = np.empty((2, pattern_size))
+            meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 1/pattern_size)
+            meds[1,:] = np.sin(2*np.pi* np.arange(pattern_size) * 2/pattern_size)
+        elif pattern_type == "f14":
+            meds = np.empty((2, pattern_size))
+            meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 1/pattern_size)
+            meds[1,:] = np.sin(2*np.pi* np.arange(pattern_size) * 4/pattern_size)
+        elif pattern_type == "f24":
+            meds = np.empty((2, pattern_size))
+            meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 2/pattern_size)
+            meds[1,:] = np.sin(2*np.pi* np.arange(pattern_size) * 4/pattern_size)
+        elif pattern_type == "f12":
+            meds = np.empty((3, pattern_size))
+            meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 1/pattern_size)
+            meds[1,:] = np.sin(2*np.pi* np.arange(pattern_size) * 2/pattern_size)
+            meds[2,:] = np.sin(2*np.pi* np.arange(pattern_size) * 4/pattern_size)
 
     else:
         meds=patterns
