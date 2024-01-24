@@ -218,7 +218,7 @@ def load_dmdataset(
             meds = np.empty((2, pattern_size))
             meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 2/pattern_size)
             meds[1,:] = np.sin(2*np.pi* np.arange(pattern_size) * 4/pattern_size)
-        elif pattern_type == "f12":
+        elif pattern_type == "f124":
             meds = np.empty((3, pattern_size))
             meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 1/pattern_size)
             meds[1,:] = np.sin(2*np.pi* np.arange(pattern_size) * 2/pattern_size)
