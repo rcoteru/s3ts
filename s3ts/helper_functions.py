@@ -227,7 +227,10 @@ def load_dmdataset(
             print("Using fft coefficients for the pattern...")
             pattern_freq = np.fft.fftfreq(pattern_size)[:pattern_size//2]
             fft_coef = process_fft_frequencies(ds.STS, ds.SCS, pattern_freq)
-            del fft_coef[100] # remove the ignore label
+
+            if 100 in fft_coef.keys():
+                del fft_coef[100] # remove the ignore label
+
             meds = np.zeros((len(fft_coef.keys()), ds.STS.shape[0], pattern_size)) # num_classes, channel, pattern_size
             for i, coef in enumerate(fft_coef.values()):
                 for c in range(meds.shape[1]):

@@ -168,8 +168,11 @@ def process_fft_frequencies(STS, SCS, frequency_values):
         current_class = SCS[class_changes[i]+1]
 
         series_part = STS[:, (class_changes[i]+1):(class_changes[i+1]+1)]
-        series_part = (series_part - np.mean(series_part, axis=1, keepdims=True)) / np.std(series_part, axis=1, keepdims=True)
+        series_part = (series_part - np.mean(series_part, axis=1, keepdims=True)) / (np.std(series_part, axis=1, keepdims=True) + 1e-6)
         fft_size = series_part.shape[1]
+        if fft_size<3:
+            continue
+
         fft_short = np.fft.fft(series_part, axis=-1, n=fft_size)[:, :(fft_size//2)]
         fft_freq = np.fft.fftfreq(fft_size)[:(fft_size//2)]
 
