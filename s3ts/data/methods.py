@@ -154,3 +154,30 @@ def get_predominant_frequency(fft_mag, mode="per_class"):
         frequencies_ordered = np.array(list(filter(lambda x: x[0]>0, sorted(out.items(), key=lambda x:x[1], reverse=True))))
 
         return frequencies_ordered
+    
+def process_fft_frequencies(STS, SCS, frequency_values):
+    class_changes = [0] + list(np.nonzero(np.diff(SCS))[0])
+
+    magnitudes = {} # a dict for each class
+    classes = np.unique(SCS)
+    for c in classes:
+        magnitudes[c] = np.zeros((STS.shape[0], frequency_values.shape[0]), dtype=np.complex128)
+    class_counts = np.zeros(256)
+
+    for i in range(len(class_changes)-1):
+        current_class = SCS[class_changes[i]+1]
+
+        series_part = STS[:, (class_changes[i]+1):(class_changes[i+1]+1)]
+        series_part = (series_part - np.mean(series_part, axis=1, keepdims=True)) / np.std(series_part, axis=1, keepdims=True)
+        fft_size = series_part.shape[1]
+        fft_short = np.fft.fft(series_part, axis=-1, n=fft_size)[:, :(fft_size//2)]
+        fft_freq = np.fft.fftfreq(fft_size)[:(fft_size//2)]
+
+        for c in range(fft_short.shape[0]):
+            freq_val = np.interp(frequency_values, fft_freq, fft_short[c, :])
+            magnitudes[current_class][c, :] *= class_counts[current_class]/(class_counts[current_class]+1)
+            magnitudes[current_class][c, :] += freq_val/(class_counts[current_class]+1)
+                
+        class_counts[current_class] += 1
+
+    return magnitudes

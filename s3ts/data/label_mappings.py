@@ -15,7 +15,7 @@ HARTH_LABELS = {
     140: "cycling_stand_idle"
 }
 
-harth_label_mapping = np.zeros(141)
+harth_label_mapping = np.zeros(141, dtype=np.int64)
 harth_label_mapping[1:9] = np.arange(8)
 harth_label_mapping[13] = 8
 harth_label_mapping[14] = 9
@@ -37,6 +37,6 @@ UCI_HAR_LABELS = {
     12: "LIE_TO_STAND",
 }
 
-ucihar_label_mapping = np.zeros(13)
+ucihar_label_mapping = np.zeros(13, dtype=np.int64)
 ucihar_label_mapping[0] = 100
 ucihar_label_mapping[1:] = np.arange(12)

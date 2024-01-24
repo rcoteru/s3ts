@@ -223,6 +223,17 @@ def load_dmdataset(
             meds[0,:] = np.sin(2*np.pi* np.arange(pattern_size) * 1/pattern_size)
             meds[1,:] = np.sin(2*np.pi* np.arange(pattern_size) * 2/pattern_size)
             meds[2,:] = np.sin(2*np.pi* np.arange(pattern_size) * 4/pattern_size)
+        elif pattern_type == "fftcoef":
+            print("Using fft coefficients for the pattern...")
+            pattern_freq = np.fft.fftfreq(pattern_size)[:pattern_size//2]
+            fft_coef = process_fft_frequencies(ds.STS, ds.SCS, pattern_freq)
+            del fft_coef[100] # remove the ignore label
+            meds = np.zeros((len(fft_coef.keys()), ds.STS.shape[0], pattern_size)) # num_classes, channel, pattern_size
+            for i, coef in enumerate(fft_coef.values()):
+                for c in range(meds.shape[1]):
+                    for j, m in enumerate(pattern_freq):
+                        meds[i, c, :] += coef[c, j].real * np.sin(2*np.pi* m * np.arange(pattern_size))
+                        meds[i, c, :] += coef[c, j].imag * np.sin(2*np.pi* m * np.arange(pattern_size))
 
     else:
         meds=patterns
