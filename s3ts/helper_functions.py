@@ -236,7 +236,31 @@ def load_dmdataset(
                 for c in range(meds.shape[1]):
                     for j, m in enumerate(pattern_freq):
                         meds[i, c, :] += coef[c, j].real * np.sin(2*np.pi* m * np.arange(pattern_size))
-                        meds[i, c, :] += coef[c, j].imag * np.sin(2*np.pi* m * np.arange(pattern_size))
+                        meds[i, c, :] += coef[c, j].imag * np.cos(2*np.pi* m * np.arange(pattern_size))
+        elif pattern_type == "fftvar":
+            print("Using fft coefficient variances across classes for the pattern...")
+            pattern_freq = np.fft.fftfreq(pattern_size)[:pattern_size//2]
+            fft_coef = process_fft_frequencies(ds.STS, ds.SCS, pattern_freq)
+
+            if 100 in fft_coef.keys():
+                del fft_coef[100] # remove the ignore label
+
+            # compute variance across classes
+            fft_coef_all = np.zeros((len(fft_coef.keys()), ds.STS.shape[0], pattern_freq.shape[0]), dtype=np.complex128)
+            for i, v in enumerate(fft_coef.values()):
+                fft_coef_all[i, :, :] = v
+
+            fft_coef_mean = np.mean(fft_coef_all, axis=(0, 1))
+
+            fft_var = np.var(np.abs(fft_coef_all), axis=(0, 1)) # shape of pattern_freq
+            fft_freq_ordered = pattern_freq[np.argsort(fft_var)] # from lower to higher variance
+            fft_coef_mean_sorted = fft_coef_mean[np.argsort(fft_var)] # from lower to higher variance
+
+            NUM_WAVES = 3
+            meds = np.zeros((NUM_WAVES, pattern_size)) # num_classes, channel, pattern_size
+            for i in range(NUM_WAVES):
+                meds[i, :] += fft_coef_mean_sorted[-1].real * np.sin(2*np.pi* fft_freq_ordered[-i] * np.arange(pattern_size))
+                meds[i, :] += fft_coef_mean_sorted[-1].imag * np.cos(2*np.pi* fft_freq_ordered[-i] * np.arange(pattern_size))
 
     else:
         meds=patterns
