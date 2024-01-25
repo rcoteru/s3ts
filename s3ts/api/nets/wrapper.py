@@ -44,8 +44,18 @@ class NoLayer(nn.Module):
     
     def forward(self, x):
         return x
+    
+class RemoveUpperPart(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__()
 
-encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG, "res_gap": RES_GAP_IMG, "none": NoLayer},
+    def get_output_shape(self):
+        return None
+    
+    def forward(self, x):
+        return x[:,:,-1,:]
+
+encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG, "res_gap": RES_GAP_IMG, "none": NoLayer, "removepattern": RemoveUpperPart},
     "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS, "simplecnn": SimpleCNN_TS, "cnn_gap": CNN_GAP_TS, "res_gap": RES_GAP_TS}}
 
 decoder_dict = {"linear": LinearDecoder, "mlp": MultiLayerPerceptron}
@@ -128,7 +138,10 @@ class WrapperModel(LightningModule):
         # create decoder
         shape: torch.Tensor = self.encoder.get_output_shape()
         if shape==None:
-            shape = (-1, channels, ref_size, wdw_len)
+            if arch=="none":
+                shape = (-1, channels, ref_size, wdw_len)
+            elif arch=="removepattern":
+                shape = (-1, channels, wdw_len)
 
         inp_feats = torch.prod(torch.tensor(shape[1:]))
         if self.task == "cls":
