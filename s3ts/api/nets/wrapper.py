@@ -84,6 +84,8 @@ class WrapperModel(LightningModule):
         # select model architecture class
         if dsrc in ["dtw", "dtw_c", "mtf", "gasf", "gadf"]:
             enc_arch: LightningModule = encoder_dict["img"][arch]
+        elif dsrc == "fft":
+            enc_arch: LightningModule = encoder_dict["ts"][arch]
         else:
             enc_arch: LightningModule = encoder_dict[dsrc][arch]
 
@@ -91,7 +93,9 @@ class WrapperModel(LightningModule):
         if dsrc == "img":
             ref_size, channels = l_patterns, n_patterns
         elif dsrc == "ts":
-            ref_size, channels = 1, self.n_dims
+            ref_size, channels = 1, self.n_dims        
+        elif dsrc == "fft":
+            ref_size, channels = 1, self.n_dims*2
         elif dsrc == "dtw":
             ref_size, channels = l_patterns, enc_feats
             self.wdw_len = wdw_len-l_patterns
@@ -171,7 +175,7 @@ class WrapperModel(LightningModule):
         # Forward pass
         if self.dsrc == "img":
             output = self.logits(batch["frame"])
-        elif self.dsrc in ["mtf", "gasf", "gadf"]:
+        elif self.dsrc in ["mtf", "gasf", "gadf", "fft"]:
             output = self.logits(batch["transformed"])
         else:
             output = self.logits(batch["series"])

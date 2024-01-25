@@ -79,6 +79,11 @@ class StreamingTimeSeriesCopy(Dataset):
         elif self.mode == "mtf":
             transformed = mtf_compute(ts, self.mtf_bins, (-1, 1))
             return {"series": ts, "label": c, "transformed": transformed}
+        
+        elif self.mode == "fft":
+            transformed = torch.fft.fft(ts, dim=-1)
+            transformed = torch.cat([transformed.real, transformed.imag], dim=0)
+            return {"series": ts, "label": c, "transformed": transformed}
 
         else:
             return {"series": ts, "label": c}
