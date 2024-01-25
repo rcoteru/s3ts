@@ -9,6 +9,8 @@ from s3ts.data.methods import reduce_imbalance
 
 from s3ts.api.gaf_mtf import mtf_compute, gaf_compute
 
+import pywt
+
 class StreamingTimeSeries(STSDataset):
 
     def __init__(self,
@@ -83,6 +85,12 @@ class StreamingTimeSeriesCopy(Dataset):
         elif self.mode == "fft":
             transformed = torch.fft.fft(ts, dim=-1)
             transformed = torch.cat([transformed.real, transformed.imag], dim=0)
+            return {"series": ts, "label": c, "transformed": transformed}
+
+        elif self.mode == "cwt_test":
+            transformed = pywt.cwt(ts.numpy(), scales=np.arange(1, ts.shape[1]//2, dtype=np.float64), sampling_period=1, wavelet="morl")[0]
+            transformed = torch.from_numpy(transformed)
+            transformed = transformed.permute(1, 0, 2)
             return {"series": ts, "label": c, "transformed": transformed}
 
         else:
