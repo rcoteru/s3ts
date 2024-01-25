@@ -35,7 +35,17 @@ import torch
 
 dtw_mode = {"dtw": DTWLayer, "dtw_c": DTWLayerPerChannel}
 
-encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG, "res_gap": RES_GAP_IMG},
+class NoLayer(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__()
+
+    def get_output_shape(self):
+        return None
+    
+    def forward(self, x):
+        return x
+
+encoder_dict = {"img": {"cnn": CNN_IMG, "res": RES_IMG, "simplecnn": SimpleCNN_IMG, "cnn_gap": CNN_GAP_IMG, "res_gap": RES_GAP_IMG, "none": NoLayer},
     "ts": {"rnn": RNN_TS, "cnn": CNN_TS, "res": RES_TS, "simplecnn": SimpleCNN_TS, "cnn_gap": CNN_GAP_TS, "res_gap": RES_GAP_TS}}
 
 decoder_dict = {"linear": LinearDecoder, "mlp": MultiLayerPerceptron}
@@ -117,6 +127,9 @@ class WrapperModel(LightningModule):
 
         # create decoder
         shape: torch.Tensor = self.encoder.get_output_shape()
+        if shape==None:
+            shape = (-1, channels, ref_size, wdw_len)
+
         inp_feats = torch.prod(torch.tensor(shape[1:]))
         if self.task == "cls":
             out_feats = self.n_classes
