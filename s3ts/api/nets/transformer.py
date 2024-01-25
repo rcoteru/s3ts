@@ -165,7 +165,7 @@ class TransformerWrapper(LightningModule):
         mask = generate_square_subsequent_mask(x.shape[-1], x.shape[-1])
 
         # x input is dims (n, d, t), transformer input must be (n, t, d)
-        x = x.transpose((0, 2, 1))
+        x = x.permute((0, 2, 1))
         x = self.transformer(x, mask=mask)
         return x
 
