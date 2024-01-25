@@ -162,7 +162,7 @@ class TransformerWrapper(LightningModule):
     
     def logits(self, x: torch.Tensor) -> torch.Tensor:
         # create mask
-        mask = generate_square_subsequent_mask(x.shape[-1], x.shape[-1])
+        mask = generate_square_subsequent_mask(x.shape[-1], x.shape[-1]).to(x.device)
 
         # x input is dims (n, d, t), transformer input must be (n, t, d)
         x = x.permute((0, 2, 1))
