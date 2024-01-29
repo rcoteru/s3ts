@@ -259,8 +259,8 @@ def load_dmdataset(
             NUM_WAVES = 3
             meds = np.zeros((NUM_WAVES, pattern_size)) # num_classes, channel, pattern_size
             for i in range(NUM_WAVES):
-                meds[i, :] += fft_coef_mean_sorted[-1].real * np.sin(2*np.pi* fft_freq_ordered[-i] * np.arange(pattern_size))
-                meds[i, :] += fft_coef_mean_sorted[-1].imag * np.cos(2*np.pi* fft_freq_ordered[-i] * np.arange(pattern_size))
+                meds[i, :] += fft_coef_mean_sorted[-i].real * np.sin(2*np.pi* fft_freq_ordered[-i] * np.arange(pattern_size))
+                meds[i, :] += fft_coef_mean_sorted[-i].imag * np.cos(2*np.pi* fft_freq_ordered[-i] * np.arange(pattern_size))
 
     else:
         meds=patterns
