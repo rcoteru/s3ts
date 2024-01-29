@@ -12,6 +12,7 @@ from pytorch_lightning import Trainer, seed_everything
 
 # in-package imports
 from s3ts.api.nets.wrapper import WrapperModel
+from s3ts.api.nets.transformer import TransformerWrapper
 from s3ts.data.base import StreamingFramesDM
 
 # other imports
@@ -161,3 +162,37 @@ def get_test_preds(dm: StreamingFramesDM, model: WrapperModel,
 
     return data, preds
 
+# trainer for transformer
+
+def train_transformer(
+        dm,
+        model: TransformerWrapper,
+        max_epochs: int,
+        ) -> tuple[TransformerWrapper, dict]:
+    print(model.name)
+
+    # reset the random seed
+    seed_everything(42, workers=True)
+
+    # set up the trainer
+    ckpt = ModelCheckpoint(
+        monitor="val_re",
+        mode="max",
+        save_top_k=-1,
+        filename='{epoch}-{step}-{val_re:.2f}'
+    )
+    print(model.name)
+    tr = Trainer(default_root_dir="./training",
+        accelerator="auto", callbacks=[ckpt, LearningRateMonitor(logging_interval="epoch")], max_epochs=max_epochs,
+        logger=TensorBoardLogger(save_dir="./training", name=model.name.replace("|", "_").replace(",", "_")))
+
+    # train the model
+    tr.fit(model=model, datamodule=dm)
+
+    # load the best weights
+    model = TransformerWrapper.load_from_checkpoint(ckpt.best_model_path)
+
+    # run the validation with the final weights
+    data = tr.test(model, datamodule=dm)
+
+    return model, data[0]

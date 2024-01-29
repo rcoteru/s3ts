@@ -2,7 +2,7 @@ import os
 from time import time
 
 from s3ts.helper_functions import load_dm, get_model, get_parser, str_time
-from s3ts.api.nets.methods import train_model
+from s3ts.api.nets.methods import train_model, train_transformer
 
 from s3ts.arguments import get_model_name
 
@@ -28,11 +28,14 @@ def main(args):
             np.save(f, dm.dfds.patterns)
     
     print("\n" + "Start training:")
-    model, data = train_model(dm, model, max_epochs=args.max_epochs, pl_kwargs={
-            "default_root_dir": args.training_dir,
-            "accelerator": "auto",
-            "seed": 42
-        })
+    if args.encoder_architecture == "transformer":
+        model, data = train_transformer(dm, model, max_epochs=args.max_epochs)
+    else:
+        model, data = train_model(dm, model, max_epochs=args.max_epochs, pl_kwargs={
+                "default_root_dir": args.training_dir,
+                "accelerator": "auto",
+                "seed": 42
+            })
     
     with open(os.path.join(args.training_dir, modeldir, "results.dict"), "w") as f:
         f.write(str({**data, **args.__dict__, "name": modelname}))

@@ -18,6 +18,8 @@ from s3ts.api.nets.methods import create_model_from_DM
 
 from torchvision.transforms import Normalize
 
+from s3ts.api.nets.transformer import TransformerWrapper
+
 def get_parser():
     parser = ArgumentParser()
 
@@ -344,6 +346,27 @@ def load_dm(args, patterns = None):
     return dm
 
 def get_model(name, args, dm):
+    if args.encoder_architecture == "transformer":
+        model = TransformerWrapper(
+            dsrc=args.mode,
+            n_dims=dm.n_dims,
+            n_classes=dm.n_classes,
+            wdw_len=dm.wdw_len,
+            wdw_str=dm.wdw_str,
+            latent_dims=args.encoder_features,
+            transformer_layers=2,
+            feedforward_mult=2,
+            n_heads=4,
+            dropout=0.1,
+            lr=args.lr,
+            voting={"rho": args.rho, "n": args.voting},
+            weight_decayL1=args.weight_decayL1,
+            weight_decayL2=args.weight_decayL2,
+            name=name,
+            args=str(args.__dict__)
+        )
+        return model
+
     model = create_model_from_DM(dm, name=name, 
         dsrc=args.mode, arch=args.encoder_architecture, dec_arch=args.decoder_architecture,
         task="cls", lr=args.lr, enc_feats=args.encoder_features, 
