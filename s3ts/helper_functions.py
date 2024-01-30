@@ -333,7 +333,7 @@ def load_dm(args, patterns = None):
             compute_n=args.compute_n, subjects_for_test=args.subjects_for_test, reduce_train_imbalance=args.reduce_imbalance, 
             label_mode=args.label_mode, num_medoids=args.num_medoids, pattern_type=args.pattern_type, overlap=args.overlap, 
             n_val_subjects=args.n_val_subjects, cached=args.cached, patterns=patterns)
-    elif args.mode in ["ts", "dtw", "dtw_c", "mtf", "gasf", "gadf", "fft", "cwt_test"]:
+    elif args.mode in ["ts", "dtw", "dtw_c", "mtf", "gasf", "gadf", "fft", "cwt_test", "dtwfeats"]:
         dm = load_tsdataset(
             args.dataset, dataset_home_directory=args.dataset_dir, 
             batch_size=args.batch_size, num_workers=args.num_workers, 

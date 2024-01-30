@@ -21,7 +21,7 @@ from s3ts.api.nets.encoders.series.RES_GAP import RES_GAP_TS
 from s3ts.api.nets.decoders.linear import LinearDecoder
 from s3ts.api.nets.decoders.mlp import MultiLayerPerceptron
 
-from s3ts.api.nets.encoders.dtw.dtw_layer import DTWLayer, DTWLayerPerChannel
+from s3ts.api.nets.encoders.dtw.dtw_layer import DTWLayer, DTWLayerPerChannel, DTWFeatures
 
 # base torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -33,7 +33,7 @@ import torch
 
 # from s3ts.api.nets.auroc import torchAUROC
 
-dtw_mode = {"dtw": DTWLayer, "dtw_c": DTWLayerPerChannel}
+dtw_mode = {"dtw": DTWLayer, "dtw_c": DTWLayerPerChannel, "dtwfeats": DTWFeatures}
 
 class NoLayer(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
@@ -102,7 +102,7 @@ class WrapperModel(LightningModule):
         self.save_hyperparameters()
 
         # select model architecture class
-        if dsrc in ["dtw", "dtw_c", "mtf", "gasf", "gadf", "cwt_test"]:
+        if dsrc in ["dtw", "dtw_c", "mtf", "gasf", "gadf", "cwt_test", "dtwfeats"]:
             enc_arch: LightningModule = encoder_dict["img"][arch]
         elif dsrc == "fft":
             enc_arch: LightningModule = encoder_dict["ts"][arch]
@@ -122,6 +122,9 @@ class WrapperModel(LightningModule):
         elif dsrc == "dtw_c":
             ref_size, channels = l_patterns, enc_feats*self.n_dims
             self.wdw_len = wdw_len-l_patterns
+        elif dsrc == "dtwfeats":
+            ref_size, channels = 1, enc_feats
+            self.wdw_len = 1
         elif dsrc in ["mtf", "gasf", "gadf", "cwt_test"]:
             ref_size, channels = wdw_len, self.n_dims
 
@@ -139,7 +142,7 @@ class WrapperModel(LightningModule):
         shape: torch.Tensor = self.encoder.get_output_shape()
         if shape==None:
             if arch=="none":
-                shape = (-1, channels, ref_size, wdw_len)
+                shape = (-1, channels, ref_size, self.wdw_len)
             elif arch=="removepattern":
                 shape = (-1, channels, wdw_len)
 

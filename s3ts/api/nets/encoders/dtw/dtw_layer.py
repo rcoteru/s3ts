@@ -33,3 +33,13 @@ class DTWLayerPerChannel(torch.nn.Module):
     def forward(self, x):
         y = torch_dtw_per_channel.apply(x, self.patts, self.w)[0][:,:,:,:,-self.l_out:]
         return y.reshape((y.shape[0], y.shape[1]*y.shape[2], y.shape[3], y.shape[4]))
+    
+class DTWFeatures(torch.nn.Module):
+    def __init__(self, n_patts, d_patts, l_patts, l_out: int = 0, rho: float = 1) -> None:
+        super().__init__()
+
+        self.w: torch.float32 = rho ** (1/l_patts)
+        self.patts = torch.nn.Parameter(torch.randn(n_patts, d_patts, l_patts))
+    
+    def forward(self, x):
+        return torch_dtw.apply(x, self.patts, self.w)[0][:,:,-1,-1]
