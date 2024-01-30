@@ -3,32 +3,32 @@ baseArguments = {
     "dataset": "HARTH",
     "subjects_for_test": [
         [21],
-        # [20],
-        # [19],
-        # [18],
-        # [17],
-        # [16],
-        # [15],
-        # [14],
-        # [13],
-        # [12],
-        # [11],
-        # [10],
-        # [9],
-        # [8],
-        # [7],
-        # [6],
-        # [5],
-        # [4],
-        # [3],
-        # [2],
-        # [1],
-        # [0]
+        [20],
+        [19],
+        [18],
+        [17],
+        [16],
+        [15],
+        [14],
+        [13],
+        [12],
+        [11],
+        [10],
+        [9],
+        [8],
+        [7],
+        [6],
+        [5],
+        [4],
+        [3],
+        [2],
+        [1],
+        [0]
     ],
     "lr": 0.001,
     "n_val_subjects": 4,
     "encoder_architecture": "cnn_gap",
-    "encoder_features": 20,
+    "encoder_features": 32,
     "decoder_architecture": "mlp",
     "decoder_features": 32,
     "decoder_layers": 1,
@@ -37,21 +37,21 @@ baseArguments = {
     "voting": 1,
     "rho": 0.1,
     "overlap": -1,
-    "max_epochs": 10,
-    "training_dir": "training_syn_1",
+    "max_epochs": 20,
+    "training_dir": "training_syn",
     "cached": False,
     "weight_decayL1": 0.0001,
-    "weight_decayL2": 0.0
+    "weight_decayL2": 0.00001
 }
 
 imgExperiments = {
-    "window_size": 32,
+    "window_size": 50,
     "window_stride": 2,
     "mode": "img",
     "num_medoids": 1,
     "compute_n": 300,
-    "pattern_type": ["f1", "f2", "f4", "f12", "f14", "f24", "f124"],
-    "pattern_size": 32
+    "pattern_type": "syn",
+    "pattern_size": 50
 }
 
 dtwExperiments = {
@@ -69,7 +69,7 @@ dtwcExperiments = {
 }
 
 tsExperiments = {
-    "window_size": 48,
+    "window_size": 50,
     "window_stride": 1,
     "mode": "ts"
 }

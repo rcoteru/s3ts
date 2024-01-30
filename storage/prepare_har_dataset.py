@@ -134,7 +134,7 @@ def prepare_harth(dataset_dir):
             splits = []
             last = 0
             for i in range(len(ds) - 1):
-                if (ds["dt"][i + 1] - ds["dt"][i]) > 100: # I get the same number of splits for 25ms, 50ms or 100 ms
+                if (ds["dt"][i + 1] - ds["dt"][i]) > 500: # I get the same number of splits for 25ms, 50ms or 100 ms
                     splits.append(ds.loc[last:i])
                     last = i + 1
             splits.append(ds.loc[last:len(ds)])
@@ -373,21 +373,21 @@ def extract_and_save_sensor_data(directory, user, mode):
 
 if __name__ == "__main__":
     download("UCI-HAR", "./datasets")
-    # download("HARTH", "./datasets")
+    download("HARTH", "./datasets")
     # download("MHEALTH", "./datasets")
-    # download("WISDM", "./datasets")
+    download("WISDM", "./datasets")
     #download("REALDISP", "./datasets")
 
     unpack("UCI-HAR", "./datasets")
-    # unpack("HARTH", "./datasets")
+    unpack("HARTH", "./datasets")
     # unpack("MHEALTH", "./datasets")
-    # unpack("WISDM", "./datasets")
+    unpack("WISDM", "./datasets")
     #unpack("REALDISP", "./datasets")
 
     prepare_uci_har("./datasets/UCI-HAR") # unneccesary
-    # prepare_harth("./datasets/HARTH")
+    prepare_harth("./datasets/HARTH")
     # prepare_mhealth("./datasets/MHEALTH")
-    # prepare_wisdm("./datasets/WISDM")
+    prepare_wisdm("./datasets/WISDM")
     #prepare_realdisp("./datasets/REALDISP")
 
     pass
