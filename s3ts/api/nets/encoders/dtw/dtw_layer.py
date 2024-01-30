@@ -1,6 +1,7 @@
 import torch
 
 from s3ts.api.nets.encoders.dtw.dtw import torch_dtw
+from s3ts.api.nets.encoders.dtw.dtw_no_matrix import torch_dtw_no_image
 from s3ts.api.nets.encoders.dtw.dtw_per_channel import torch_dtw_per_channel
 
 class DTWLayer(torch.nn.Module):
@@ -42,4 +43,4 @@ class DTWFeatures(torch.nn.Module):
         self.patts = torch.nn.Parameter(torch.randn(n_patts, d_patts, l_patts))
     
     def forward(self, x):
-        return torch_dtw.apply(x, self.patts, self.w)[0][:,:,-1,-1]
+        return torch_dtw_no_image.apply(x, self.patts, self.w)[0]
