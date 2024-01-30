@@ -16,21 +16,42 @@ def dtw_compute_full(dtw: torch.Tensor, dist_grad: torch.Tensor, w: float) -> to
 
             dtw[:, :, i, j] += value
 
-    temp = dtw[:, :, -1, -1] # max value of dtw to find path
-    pathfind = torch.empty((4, ) + temp.shape, device=dtw.device)
+    i0 = torch.full((n, k), len_pattern-1, dtype=torch.int64, device=dtw.device)
+    j0 = torch.full((n, k), len_window-1, dtype=torch.int64, device=dtw.device)
 
-    # find path and compute gradients
-    for i in range(len_pattern - 1, -1, -1): # pl
-        for j in range(len_window - 1, -1, -1): # ws
-            pathfind[0] = temp
-            pathfind[1] = dtw[:, :, i-1, j]
-            pathfind[2] = dtw[:, :, i-1, j-1]
-            pathfind[3] = dtw[:, :, i, j-1]
-            
-            id = torch.argmin(pathfind, dim=0) # shape n, k (values 0, 1, 2, 3)
-            temp = torch.gather(pathfind, 0, id.unsqueeze(0)).squeeze(0)
+    # TODO solucionar esto
+    for step in range(len_pattern + len_window):
+        mask = i0!=0 & j0!=0
 
-            grads[id!=0][:,:,i] = dist_grad[id!=0][:, :, i, j]
+        current_values = dtw[]
+        grads.index_add_(3, i0, torch.gather(dist_grad, dim=-1, index=j0.unsqueeze(-1).unsqueeze(-1)).sum(-1))
+
+        temp = torch.stack([
+            dtw[:, :, ]
+        ])
+
+    for m in range(n):
+        for h in range(k):
+            i0, j0 = len_pattern-1, len_window-1
+            for step in range(len_pattern + len_window):
+                if i0==0 and j0==0:
+                    break
+                grads[m, h, :, i0] += dist_grad[m, h, :, i0, j0]
+                if i0==0: # path is (i, j-1)
+                    j0-=1
+                elif j0==0: # path is (i-1, j)
+                    i0-=1
+                else:
+                    id = torch.argmin(
+                        torch.tensor([dtw[m, h, i0-1, j0], dtw[m, h, i0, j0-1], dtw[m, h, i0-1, j0-1]])
+                    )
+                    if id==0:
+                        i0-=1
+                    elif id==1:
+                        j0-=1
+                    else:
+                        i0-=1
+                        j0-=1
 
     return grads
 
