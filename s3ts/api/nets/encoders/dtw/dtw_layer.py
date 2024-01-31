@@ -3,6 +3,7 @@ import torch
 from s3ts.api.nets.encoders.dtw.dtw import torch_dtw
 from s3ts.api.nets.encoders.dtw.dtw_no_matrix import torch_dtw_no_image
 from s3ts.api.nets.encoders.dtw.dtw_per_channel import torch_dtw_per_channel
+from s3ts.api.nets.encoders.dtw.dtw_pycuda import torch_dtw_cuda
 
 class DTWLayer(torch.nn.Module):
     def __init__(self, n_patts, d_patts, l_patts, l_out: int = None, rho: float = 1) -> None:
@@ -43,4 +44,5 @@ class DTWFeatures(torch.nn.Module):
         self.patts = torch.nn.Parameter(torch.randn(n_patts, d_patts, l_patts))
     
     def forward(self, x):
-        return torch_dtw_no_image.apply(x, self.patts, self.w)
+        x = torch_dtw_cuda.apply(x, self.patts, self.w)
+        return x.sqrt()
