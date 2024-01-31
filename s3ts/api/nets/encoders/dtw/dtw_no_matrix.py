@@ -16,50 +16,24 @@ def dtw_compute_full(dtw: torch.Tensor, dist_grad: torch.Tensor, w: float) -> to
 
             dtw[:, :, i, j] += value
 
-    for n0 in range(n):
-        for k0 in range(k):
-            i0 = len_pattern-1
-            j0 = len_window-1
-            while i0+j0>=0:
-                if i0==0:
-                    grads[n0, k0, :, i0] += dist_grad[n0, k0, :, i0, :(j0+1)].sum(1)
-                    break
-                if j0==0:
-                    grads[n0, k0, :, :(i0+1)] += dist_grad[n0, k0, :, :(i0+1), 0]
-                    break
+    for i0 in range(len_pattern-1, -1, -1):
+        for j0 in range(len_window-1, -1, -1):
+            mask = ~torch.isinf(dtw[:, :, i0, j0])
+            grads[:, :, :, i0][mask] += dist_grad[:, :, :, i0, j0][mask]
 
-                grads[n0, k0, :, i0] += dist_grad[n0, k0, :, i0, j0]
+            if j0==0 or i0==0:
+                continue
 
-                paths = torch.stack([
-                    dtw[n0, k0, i0, j0-1],
-                    dtw[n0, k0, i0-1, j0],
-                    dtw[n0, k0, i0-1, j0-1]            
-                ])
+            paths = torch.stack([
+                dtw[:, :, i0, j0-1],
+                dtw[:, :, i0-1, j0],
+                dtw[:, :, i0-1, j0-1]
+            ])
 
-                id = paths.argmin(0)
-                if id!=0:
-                    i0-=1
-                if id!=1:
-                    j0-=1
+            id = paths.argmin(0)
 
-    # for i0 in range(len_pattern-1, -1, -1):
-    #     for j0 in range(len_window-1, -1, -1):
-    #         mask = ~torch.isinf(dtw[:, :, i0, j0])
-    #         grads[:, :, :, i0][mask] += dist_grad[:, :, :, i0, j0][mask]
-
-    #         if j0==0 or i0==0:
-    #             continue
-
-    #         paths = torch.stack([
-    #             dtw[:, :, i0, j0-1],
-    #             dtw[:, :, i0-1, j0],
-    #             dtw[:, :, i0-1, j0-1]            
-    #         ])
-
-    #         id = paths.argmin(0)
-
-    #         dtw[:, :, i0, :j0][(id!=1) & mask] = float("inf")
-    #         dtw[:, :, :i0, j0][(id!=0) & mask] = float("inf")
+            dtw[:, :, i0, :j0][(id!=0) & mask] = float("inf")
+            dtw[:, :, :i0, j0][(id!=1) & mask] = float("inf")
 
     return grads
 
