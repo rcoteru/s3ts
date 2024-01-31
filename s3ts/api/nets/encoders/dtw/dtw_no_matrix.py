@@ -16,42 +16,24 @@ def dtw_compute_full(dtw: torch.Tensor, dist_grad: torch.Tensor, w: float) -> to
 
             dtw[:, :, i, j] += value
 
-    i0 = torch.full((n, k), len_pattern-1, dtype=torch.int64, device=dtw.device)
-    j0 = torch.full((n, k), len_window-1, dtype=torch.int64, device=dtw.device)
+    for i0 in range(len_pattern-1, -1, -1):
+        for j0 in range(len_window-1, -1, -1):
+            mask = ~torch.isinf(dtw[:, :, i0, j0])
+            grads[:, :, :, i0][mask] += dist_grad[:, :, :, i0, j0][mask]
 
-    # TODO solucionar esto
-    for step in range(len_pattern + len_window):
-        mask = i0!=0 & j0!=0
+            if j0==0 or i0==0:
+                continue
 
-        current_values = dtw[]
-        grads.index_add_(3, i0, torch.gather(dist_grad, dim=-1, index=j0.unsqueeze(-1).unsqueeze(-1)).sum(-1))
+            paths = torch.stack([
+                dtw[:, :, i0, j0-1],
+                dtw[:, :, i0-1, j0],
+                dtw[:, :, i0-1, j0-1]            
+            ])
 
-        temp = torch.stack([
-            dtw[:, :, ]
-        ])
+            id = paths.argmin(0)
 
-    for m in range(n):
-        for h in range(k):
-            i0, j0 = len_pattern-1, len_window-1
-            for step in range(len_pattern + len_window):
-                if i0==0 and j0==0:
-                    break
-                grads[m, h, :, i0] += dist_grad[m, h, :, i0, j0]
-                if i0==0: # path is (i, j-1)
-                    j0-=1
-                elif j0==0: # path is (i-1, j)
-                    i0-=1
-                else:
-                    id = torch.argmin(
-                        torch.tensor([dtw[m, h, i0-1, j0], dtw[m, h, i0, j0-1], dtw[m, h, i0-1, j0-1]])
-                    )
-                    if id==0:
-                        i0-=1
-                    elif id==1:
-                        j0-=1
-                    else:
-                        i0-=1
-                        j0-=1
+            dtw[:, :, i0, :j0][(id!=1) & mask] = float("inf")
+            dtw[:, :, :i0, j0][(id!=0) & mask] = float("inf")
 
     return grads
 
@@ -104,7 +86,7 @@ class torch_dtw_no_image(torch.autograd.Function):
 
     @staticmethod
     def forward(x: torch.Tensor, y: torch.Tensor, w: float):
-        DTW, p_diff = dtw_fast_no_image(x, y, w, compute_gradients=y.requires_grad)
+        DTW, p_diff = dtw_fast_no_image(x, y.clone().detach(), w, compute_gradients=y.requires_grad)
         return DTW[:, :, -1, -1], p_diff
     
     @staticmethod
