@@ -97,4 +97,4 @@ class torch_dtw_no_image(torch.autograd.Function):
         # dtw_grad dims (n, k) p_diff dims (n, k, d, pl)
         p_diff, = ctx.saved_tensors
         mult = (p_diff * dtw_grad[:, :, None, None]) # dims (n, k, d)
-        return None, mult.mean(0), None # dims (n, d, k)
+        return None, mult.sum(0), None # dims (n, d, k)
