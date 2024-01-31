@@ -43,4 +43,4 @@ class DTWFeatures(torch.nn.Module):
         self.patts = torch.nn.Parameter(torch.randn(n_patts, d_patts, l_patts))
     
     def forward(self, x):
-        return torch_dtw_no_image.apply(x, self.patts, self.w)[0]
+        return torch_dtw_no_image.apply(x, self.patts, self.w)

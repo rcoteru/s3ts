@@ -85,17 +85,15 @@ def dtw_fast_no_image(x: torch.Tensor, y: torch.Tensor, w: float, eps: float = 1
 class torch_dtw_no_image(torch.autograd.Function):
 
     @staticmethod
-    def forward(x: torch.Tensor, y: torch.Tensor, w: float):
-        DTW, p_diff = dtw_fast_no_image(x, y.clone().detach(), w, compute_gradients=y.requires_grad)
-        return DTW[:, :, -1, -1], p_diff
-    
-    @staticmethod
-    def setup_context(ctx, inputs, output):
-        DTW, p_diff = output
+    def forward(ctx, x: torch.Tensor, y: torch.Tensor, w: float):
+        DTW, p_diff = dtw_fast_no_image(x, y.detach(), w, compute_gradients=y.requires_grad)
+
         ctx.save_for_backward(p_diff)
+
+        return DTW[:, :, -1, -1]
     
     @staticmethod
-    def backward(ctx, dtw_grad, p_diff_grad):
+    def backward(ctx, dtw_grad):
         # dtw_grad dims (n, k) p_diff dims (n, k, d, pl)
         p_diff, = ctx.saved_tensors
         mult = (p_diff * dtw_grad[:, :, None, None]) # dims (n, k, d)
