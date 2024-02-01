@@ -109,6 +109,7 @@ def compute_oDTW(
 
     # Compute point-wise distances
     compute_pointwise_ED2(DM, STS, patts)
+    DM = np.sqrt(DM)
 
     np.cumsum(DM[:,0,:], axis=1, out=DM[:,0,:])
     np.cumsum(DM[:,:,0], axis=1, out=DM[:,:,0])
@@ -116,7 +117,7 @@ def compute_oDTW(
     fill_dtw(DM, w)
 
     # Return the DM
-    return np.sqrt(DM)
+    return DM
 
 # Channel-wise computation of the DM
 @jit(nopython=True, parallel=True)
