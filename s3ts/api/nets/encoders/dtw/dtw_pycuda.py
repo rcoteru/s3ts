@@ -68,7 +68,7 @@ def dtw_fast_cuda(x: torch.Tensor, y: torch.Tensor, w: float, eps: float = 1e-5,
     euc_d = torch.square(p_diff).sum(2).sqrt() # shape (n, n_kernel, kernel_size, T)
 
     if compute_gradients:
-        p_diff /= torch.sqrt(euc_d[:,:, None, :, :] + eps)
+        p_diff /= euc_d[:,:, None, :, :] + eps
 
     # compute dtw
     euc_d[:,:,0,:] = torch.cumsum(euc_d[:,:,0,:], dim=2)
