@@ -45,4 +45,4 @@ class DTWFeatures(torch.nn.Module):
     
     def forward(self, x):
         x = torch_dtw_cuda.apply(x, self.patts, self.w)
-        return x.sqrt()
+        return x
