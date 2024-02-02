@@ -4,7 +4,7 @@ import torch.cuda
 from numba import cuda, jit, prange 
 
 @cuda.jit
-def dtw_forward(dtw, w):
+def dtw_fill(dtw, w):
     '''
         dtw of shape (n, k, pattern_len, window_size)
     '''
@@ -17,6 +17,8 @@ def dtw_forward(dtw, w):
             for j in range(1, len_window): # ws
                 value = min(w * min(dtw[x, y, i, j-1], dtw[x, y, i-1, j-1]), dtw[x, y, i-1, j])
                 dtw[x, y, i, j] += value
+
+        cuda.syncthreads()
 
 @cuda.jit
 def dtw_backward(dtw, dist_grad, grad):
@@ -55,8 +57,10 @@ def dtw_backward(dtw, dist_grad, grad):
                         for i in range(i0):
                             dtw[x, y, i, j0] = np.inf
 
+        cuda.syncthreads()
+
 # @torch.jit.script
-def dtw_fast_cuda(x: torch.Tensor, y: torch.Tensor, w: float, eps: float = 1e-5, compute_gradients: bool=True):
+def dtw_forward(x: torch.Tensor, y: torch.Tensor, w: float):
     # shape of x (n, dim, x_len) y (m, dim, y_len)
 
     # performs convolution-like operation, for each kernel the DF
@@ -65,42 +69,35 @@ def dtw_fast_cuda(x: torch.Tensor, y: torch.Tensor, w: float, eps: float = 1e-5,
 
     # compute pairwise diffs (squared)
     p_diff = x[:,None,:,None,:] - y[None,:,:,:,None] # shape (n, n_kernel, d, Kernel_size, T)
-    euc_d = torch.square(p_diff).sum(2).sqrt() # shape (n, n_kernel, kernel_size, T)
+    euc_d = torch.square(p_diff).sum(2) # shape (n, n_kernel, kernel_size, T)
 
-    if compute_gradients:
-        p_diff /= euc_d[:,:, None, :, :] + eps
+    # if compute_gradients:
+    #     p_diff /= euc_d[:,:, None, :, :] + eps
 
     # compute dtw
     euc_d[:,:,0,:] = torch.cumsum(euc_d[:,:,0,:], dim=2)
     euc_d[:,:,:,0] = torch.cumsum(euc_d[:,:,:,0], dim=2)
 
-    if compute_gradients:
-        # p_diff now contains the partial derivatives of DTW[n, k, i, j] wrt K[k, d, i] (dims (n, k, d, i, j))
-        
-        grads = torch.zeros((x.shape[0],) + y.shape, device=x.device)
-        
-        dtw_forward[(16, 16), (16, 16)](cuda.as_cuda_array(euc_d), w) # dims (n, k, d, i, i, j)
-        dtw_backward[(16, 16), (16, 16)](cuda.as_cuda_array(euc_d), cuda.as_cuda_array(p_diff), cuda.as_cuda_array(grads))
-        
-        return euc_d, grads
-    else:
-        dtw_forward[(16, 16), (16, 16)](cuda.as_cuda_array(euc_d), w)
+    dtw_fill[(16, 16), (16, 16)](cuda.as_cuda_array(euc_d), w)
 
-        return euc_d, None
+    return euc_d, p_diff
     
 class torch_dtw_cuda(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, x: torch.Tensor, y: torch.Tensor, w: float):
-        DTW, p_diff = dtw_fast_cuda(x, y.detach(), w, compute_gradients=y.requires_grad)
+    def forward(ctx, x: torch.Tensor, y: torch.Tensor, w: float = 1):
+        DTW, p_diff = dtw_forward(x, y, w)
 
-        ctx.save_for_backward(p_diff)
+        ctx.save_for_backward(DTW, p_diff)
 
         return DTW[:, :, -1, -1]
     
     @staticmethod
     def backward(ctx, dtw_grad):
         # dtw_grad dims (n, k) p_diff dims (n, k, d, pl)
-        p_diff, = ctx.saved_tensors
-        mult = (p_diff * dtw_grad[:, :, None, None]) # dims (n, k, d)
+        dtw, p_diff = ctx.saved_tensors
+        grads = torch.zeros((dtw.shape[0],) + p_diff.shape[1:-1], device=dtw_grad.device)
+        dtw_backward[(16, 16), (16, 16)](cuda.as_cuda_array(dtw), cuda.as_cuda_array(p_diff), cuda.as_cuda_array(grads))
+
+        mult = (dtw_grad[:, :, None, None] * grads) # dims (n, k, d)
         return None, mult.mean(0), None # dims (n, d, k)
