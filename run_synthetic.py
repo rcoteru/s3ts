@@ -11,14 +11,15 @@ from pathlib import Path
 # Settings
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-PRET_TABLE = 0          # Pretrain the DF encoders for the table comparison
-COMP_TABLE_DL = 0       # Train loop for the table comparison (DL METHODS)
-COMP_TABLE_NN = 0       # Train loop for the table comparison (NN-DTW)
+# Choose the experiments to run
+CTABLE_PRET = 0         # Pretrain the DF encoders for the table comparison
+CTABLE_RUN  = 0         # Train loop for the table comparison (DL METHODS)
 
-PRET_ABLAT = 0          # Pretrain the DF encoders (ablation study)
+ABLAT_PRET = 0          # Pretrain the DF encoders (ablation study)
 ABLAT_TIMEDIL = 0       # Ablation Study: Time dilation
 ABLAT_SELFSUP = 0       # Ablation Study; Self-supervised pretraining
 
+# SLURM settings
 USE_SBATCH = 0
 SETTINGS_YAML = Path("slurm/hipat-large.yaml")
 
@@ -67,6 +68,7 @@ DIR_ENCODERS = Path("encoders/")
 DIR_DATASETS = Path("datasets/")
 DIR_TRAINING = Path("training/experiments")
 
+# Shared experiment setup
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 # Load SLURM settings if needed
@@ -80,27 +82,139 @@ SHARED_ARGS = {"rho_dfs": RHO_DFS, "batch_size": BATCH_SIZE, "val_size": VAL_SIZ
     "dir_results": DIR_RESULTS,"dir_encoders": DIR_ENCODERS,
     "dir_datasets": DIR_DATASETS, "dir_training": DIR_TRAINING}
 
+# Experiment loop for the comparison table
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
 # Pretrain encoders for the comparison table
-if PRET_TABLE:
+if CTABLE_PRET:
     dsrcs: list[Literal["df","gf"]] = ["df", "gf"]
     for dsrc in dsrcs:
         for arch in ARCHS[dsrc]:
             for dset in DATASETS:
+
+                # Window parameters
+                wdw_len = WDW_LEN[0]
+                wdw_str = DATASETS[dset]//WDW_LEN[0]
+
                 # Full series
                 setts = ExperimentSettings(
                     dset=dset, dsrc=dsrc, arch=arch,
-                    wdw_len=WDW_LEN[0], str_sts=False,
-                    wdw_str=DATASETS[dset]//WDW_LEN[0],
+                    wdw_len=wdw_len, wdw_str=wdw_str,
                     enc_feats=ARCHS[dsrc][arch],
+                    str_sts=False,
                     **SHARED_ARGS)
-                run_loop(setts)
+                run_loop(setts, slurm_settings=SLURM_SETTINGS)
                 # Strided series
                 setts = ExperimentSettings(
                     dset=dset, dsrc=dsrc, arch=arch,
-                    wdw_len=WDW_LEN[0], str_sts=True,
-                    wdw_str=DATASETS[dset]//WDW_LEN[0],
+                    wdw_len=wdw_len, wdw_str=wdw_str,
                     enc_feats=ARCHS[dsrc][arch],
+                    str_sts=True,
                     **SHARED_ARGS)
-                run_loop(setts)
+                run_loop(setts, slurm_settings=SLURM_SETTINGS)
 
-# etc...
+
+# Run experiments for the comparison table
+if CTABLE_RUN:
+    for cv_rep in CV_REPS:
+        
+        # TS methods
+        dsrcs: list[Literal["ts"]] = ["ts"]
+        for dsrc in dsrcs:
+            for arch in ARCHS[dsrc]:
+                for dset in DATASETS:
+                    wdw_len = -1 if arch == "nn" else DATASETS[dset]
+                    setts = ExperimentSettings(
+                        dset=dset, dsrc=dsrc, arch=arch,
+                        wdw_len=wdw_len, str_sts=False, wdw_str=1,
+                        enc_feats=ARCHS[dsrc][arch],
+                        **SHARED_ARGS)
+                    run_loop(setts, slurm_settings=SLURM_SETTINGS)
+                
+        # IMG methods
+        dsrcs: list[Literal["df","gf"]] = ["df", "gf"]
+        for dsrc in dsrcs:
+            for arch in ARCHS[dsrc]:
+                for dset in DATASETS:
+
+                    # Window parameters
+                    wdw_len = WDW_LEN[0]
+                    wdw_str = DATASETS[dset]//WDW_LEN[0]
+
+                    # No pretrain
+                    setts = ExperimentSettings(
+                    dset=dset, dsrc=dsrc, arch=arch,
+                    wdw_len=wdw_len, wdw_str=wdw_str,
+                    enc_feats=ARCHS[dsrc][arch],
+                    str_sts=False,
+                    **SHARED_ARGS)
+                    run_loop(setts, slurm_settings=SLURM_SETTINGS)
+
+                    # Full series pretrain
+                    setts = ExperimentSettings(
+                    dset=dset, dsrc=dsrc, arch=arch,
+                    wdw_len=wdw_len, wdw_str=wdw_str,
+                    enc_feats=ARCHS[dsrc][arch],
+                    str_sts=False,
+                    **SHARED_ARGS)
+                    run_loop(setts, slurm_settings=SLURM_SETTINGS)
+
+                    # Strided series pretrain
+                    setts = ExperimentSettings(
+                    dset=dset, dsrc=dsrc, arch=arch,
+                    wdw_len=wdw_len, wdw_str=wdw_str,
+                    enc_feats=ARCHS[dsrc][arch],
+                    str_sts=True,
+                    **SHARED_ARGS)
+                    run_loop(setts, slurm_settings=SLURM_SETTINGS)
+
+# Experiment loop for the ablation study
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+# Ablation study: time dilation
+if ABLAT_TIMEDIL:
+    for cv_rep in CV_REPS:
+        # IMG methods
+        dsrcs: list[Literal["df","gf"]] = ["df", "gf"]
+        for dsrc in dsrcs:
+            for arch in ARCHS[dsrc]:
+                for dset in DATASETS:
+                    # Window parameters
+                    wdw_len = WDW_LEN[0]
+                    for wdw_str in WDW_STR:
+                        # No pretrain
+                        setts = ExperimentSettings(
+                        dset=dset, dsrc=dsrc, arch=arch,
+                        wdw_len=wdw_len, wdw_str=wdw_str,
+                        enc_feats=ARCHS[dsrc][arch],
+                        str_sts=False,
+                        **SHARED_ARGS)
+                        run_loop(setts, slurm_settings=SLURM_SETTINGS)
+
+# Pretrain encoders for the ablation study
+if ABLAT_PRET:
+    dsrcs: list[Literal["df","gf"]] = ["df", "gf"]
+    for dsrc in dsrcs:
+        for arch in ARCHS[dsrc]:
+            for dset in DATASETS:
+                # Window parameters
+                wdw_len = WDW_LEN[0]
+                for wdw_str in WDW_STR:
+                    # Full series
+                    setts = ExperimentSettings(
+                        dset=dset, dsrc=dsrc, arch=arch,
+                        wdw_len=wdw_len, wdw_str=wdw_str,
+                        enc_feats=ARCHS[dsrc][arch],
+                        str_sts=False,
+                        **SHARED_ARGS)
+                    run_loop(setts, slurm_settings=SLURM_SETTINGS)
+                    # Strided series
+                    setts = ExperimentSettings(
+                        dset=dset, dsrc=dsrc, arch=arch,
+                        wdw_len=wdw_len, wdw_str=wdw_str,
+                        enc_feats=ARCHS[dsrc][arch],
+                        str_sts=True,
+                        **SHARED_ARGS)
+                    run_loop(setts, slurm_settings=SLURM_SETTINGS)
+
+
