@@ -65,8 +65,3 @@ python run_sbatch.py
 The analysis and figures of the paper can be reproduced either running the **s3ts/analisis.py** script or the **analysis.ipynb** notebook. The notebook is more interactive and allows the user to explore the results in more detail.
 
 The script **figures/networks/generator.py** can be used to generate network diagrams such as those in the same folder. It requires the **graphviz** package to be installed.
-
-<p align="center">
-<img src="figures/networks/img-cnn.png" alt="" width="300"/> </br>
-<em> Diagram of the CNN-based networks used for STS classification. </em>
-</p>
